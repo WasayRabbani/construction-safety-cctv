@@ -1,0 +1,5 @@
+node_modules/
+Face_recognition/.venv/
+Face_recognition/__pycache__/
+*.pt
+*.whl

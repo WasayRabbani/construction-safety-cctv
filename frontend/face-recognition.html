@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Face Recognition Attendance</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: #1E1E1E;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #FFC107; font-size: 28px; font-weight: 700; }
+        .nav-menu {
+            background: #1E1E1E;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: transparent;
+            color: #D1D5DB;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nav-btn:hover { transform: translateY(-2px); background: #333; }
+        .nav-btn.active { background: #FFC107; color: #121212; border-color: #FFC107; font-weight: 700; }
+        .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .card {
+            background: #1E1E1E;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .card h2 {
+            color: #FFC107;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            aspect-ratio: 16/9;
+            border: 1px solid #333;
+        }
+        #webcamVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror effect */
+        }
+        .live-badge {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #ef4444;
+        }
+        .recording-dot {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .btn-scan { background: #FFC107; color: #121212; }
+        .btn:hover { transform: translateY(-2px); background: #F5B301; }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            display: none;
+        }
+        .result-success { background: rgba(72, 187, 120, 0.2); color: #68d391; border: 1px solid #68d391; }
+        .result-error { background: rgba(245, 101, 101, 0.2); color: #fc8181; border: 1px solid #fc8181; }
+        
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-item {
+            padding: 12px;
+            background: #2D2D2D;
+            border-left: 4px solid #FFC107;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log-time {
+            font-size: 11px;
+            color: #9CA3AF;
+            margin-bottom: 5px;
+        }
+        .log-text {
+            font-size: 14px;
+            color: #F3F4F6;
+            font-weight: bold;
+        }
+        .log-success { border-left-color: #68d391; }
+        .log-error { border-left-color: #fc8181; }
+        
+        select.btn {
+            background: #2D2D2D;
+            color: #F3F4F6;
+            border: 1px solid #444;
+        }
+        select.btn:hover {
+            background: #333;
+            transform: none;
+        }
+
+        @media (max-width: 768px) {
+            .content-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fa-solid fa-bullseye"></i> Smart Webcam Attendance</h1>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
+            <a href="cctv.html" class="nav-btn">CCTV Feeds</a>
+            <a href="face_registration.html" class="nav-btn">Register Faces</a>
+            <a href="attendance.html" class="nav-btn">Attendance</a>
+            <a href="workers.html" class="nav-btn">Workers</a>
+            <a href="face-recognition.html" class="nav-btn active">Webcam Attendance</a>
+        </nav>
+
+        <div class="content-grid">
+            <div class="card">
+                <h2><i class="fa-solid fa-camera"></i> Step In Front of the Camera</h2>
+                
+                <div class="video-container">
+                    <video id="webcamVideo" autoplay muted playsinline></video>
+                    <div class="live-badge">
+                        <div class="recording-dot"></div>
+                        STANDBY
+                    </div>
+                </div>
+                
+                <canvas id="snapshotCanvas" style="display: none;"></canvas>
+
+                <div class="controls" style="flex-direction: column; align-items: center;">
+                    <div id="cameraControls" style="margin-bottom: 15px; width: 100%; max-width: 400px;">
+                        <label for="videoSource" style="display: block; color: #9CA3AF; font-weight: 600; margin-bottom: 8px; font-size: 14px;"><i class="fa-solid fa-video"></i> Select Camera Source:</label>
+                        <select id="videoSource" class="btn" style="width: 100%; background: #2D2D2D; color: #F3F4F6; border: 1px solid #444; font-size: 14px; padding: 10px; text-align: left;">
+                            <option value="">Loading cameras...</option>
+                        </select>
+                    </div>
+
+                    <button id="scanBtn" class="btn btn-scan" onclick="scanFace()">
+                        <i class="fa-solid fa-circle-check" style="color: #68d391;"></i> Mark Attendance (Scan Face)
+                    </button>
+                </div>
+
+                <div id="resultBox" class="result-box"></div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fa-solid fa-clipboard-list"></i> Today's Logs</h2>
+                <div class="log-container" id="activityLog">
+                    <p style="text-align: center; color: #a0aec0; padding: 20px;">
+                        No check-ins yet. Step up to scan!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ========== AUTH CHECK ==========
+    window.addEventListener('load', () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+            return;
+        }
+    });
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    }
+    // ========== END AUTH ==========
+    </script>
+
+    <script>
+        const video = document.getElementById('webcamVideo');
+        const canvas = document.getElementById('snapshotCanvas');
+        const scanBtn = document.getElementById('scanBtn');
+        const resultBox = document.getElementById('resultBox');
+        
+        const videoSource = document.getElementById('videoSource');
+        let currentStream = null;
+        
+        // List cameras and start default
+        async function getCameras() {
+            try {
+                // Request initial permission to get labels
+                await navigator.mediaDevices.getUserMedia({ video: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                videoSource.innerHTML = '';
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${videoSource.length + 1}`;
+                    videoSource.appendChild(option);
+                });
+
+                // Auto-detect Integrated Webcam
+                if (videoDevices.length > 0) {
+                    let defaultDevice = videoDevices[0];
+                    for (const device of videoDevices) {
+                        const label = device.label.toLowerCase();
+                        if (label.includes('integrated') || label.includes('built-in') || label.includes('webcam')) {
+                            defaultDevice = device;
+                            break;
+                        }
+                    }
+                    videoSource.value = defaultDevice.deviceId;
+                    startWebcam(defaultDevice.deviceId);
+                }
+            } catch (err) {
+                console.error("Error listing cameras: ", err);
+                videoSource.innerHTML = '<option value="">No cameras found</option>';
+            }
+        }
+
+        async function startWebcam(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+                showResult("Failed to access selected camera. Please try another.", "error");
+            }
+        }
+
+        videoSource.onchange = () => startWebcam(videoSource.value);
+        getCameras();
+
+        // Release camera when tab is hidden so CCTV can use it
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                    video.srcObject = null;
+                }
+            } else {
+                if (videoSource.value) {
+                    startWebcam(videoSource.value);
+                } else {
+                    getCameras();
+                }
+            }
+        });
+
+        // Scan the face and send to backend
+        async function scanFace() {
+            // Setup canvas context to draw image
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw current video frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get base64 string
+            const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Change button state
+            scanBtn.disabled = true;
+            scanBtn.textContent = '⏳ Processing...';
+            hideResult();
+
+            try {
+                // Send to our Node backend face-attendance route
+                const response = await fetch('/api/face-attendance/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult(data.message, "success");
+                    addLog(data.worker.name, data.message, "success");
+                } else {
+                    showResult(data.message || data.error, "error");
+                    addLog("Unknown", data.message || data.error, "error");
+                }
+            } catch (error) {
+                console.error("Error sending image: ", error);
+                showResult("Server error. Make sure the Node server and Python API are running.", "error");
+            } finally {
+                // Reset button
+                setTimeout(() => {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = '🟢 Mark Attendance (Scan Face)';
+                }, 3000); // 3 seconds cooldown
+            }
+        }
+
+        function showResult(message, type) {
+            resultBox.textContent = message;
+            resultBox.className = `result-box result-${type}`;
+            resultBox.style.display = 'block';
+        }
+
+        function hideResult() {
+            resultBox.style.display = 'none';
+        }
+
+        function addLog(name, message, type) {
+            const container = document.getElementById('activityLog');
+            const time = new Date().toLocaleTimeString();
+            
+            const logItem = document.createElement('div');
+            logItem.className = `log-item log-${type}`;
+            logItem.innerHTML = `
+                <div>
+                    <div class="log-text">${name}</div>
+                    <div class="log-time" style="margin-top:4px;">${message}</div>
+                </div>
+                <div class="log-time">${time}</div>
+            `;
+            
+            // Remove the empty message if it exists
+            if (container.firstChild && container.firstChild.tagName === 'P') {
+                container.innerHTML = '';
+            }
+            
+            container.insertBefore(logItem, container.firstChild);
+        }
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

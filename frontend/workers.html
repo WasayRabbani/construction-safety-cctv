@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workers Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: #1E1E1E;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { color: #FFC107; font-size: 28px; font-weight: 700; }
+        .nav-menu {
+            background: #1E1E1E;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: transparent;
+            color: #D1D5DB;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nav-btn:hover { transform: translateY(-2px); background: #333; }
+        .nav-btn.active { background: #FFC107; color: #121212; border-color: #FFC107; font-weight: 700; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #1E1E1E;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #FFC107;
+        }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+        .stat-icon { font-size: 32px; margin-bottom: 10px; }
+        .stat-value { font-size: 32px; font-weight: 700; color: #F3F4F6; margin-bottom: 5px; }
+        .stat-label { font-size: 13px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card {
+            background: #1E1E1E;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .card-title { color: #FFC107; font-size: 20px; font-weight: 700; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #FFC107; color: #121212; }
+        .btn-success { background: #48bb78; color: #121212; }
+        .btn:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .search-filter { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #2D2D2D;
+            color: #F3F4F6;
+        }
+        .search-input:focus { outline: none; border-color: #FFC107; box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2); }
+        .filter-select {
+            padding: 12px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #2D2D2D;
+            color: #F3F4F6;
+        }
+        .filter-select:focus { outline: none; border-color: #FFC107; box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2); }
+        .workers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .worker-card {
+            background: #1E1E1E;
+            border-radius: 12px;
+            border: 1px solid #333;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .worker-card:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+        .worker-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .worker-photo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #FFC107;
+            color: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .worker-info { flex: 1; }
+        .worker-name { font-size: 16px; font-weight: 700; color: #F3F4F6; margin-bottom: 3px; }
+        .worker-id { font-size: 13px; color: #9CA3AF; font-weight: 600; }
+        .worker-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .detail-item { display: flex; flex-direction: column; gap: 3px; }
+        .detail-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .detail-value { font-size: 13px; color: #D1D5DB; font-weight: 600; }
+        .worker-actions { display: flex; gap: 8px; margin-top: 15px; }
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .action-edit { background: #2D2D2D; color: #D1D5DB; border: 1px solid #444; }
+        .action-edit:hover { background: #333; }
+        .action-delete { background: rgba(245, 101, 101, 0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .action-delete:hover { background: rgba(245, 101, 101, 0.4); }
+        .status-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #1E1E1E;
+        }
+        .status-active { background: #48bb78; }
+        .status-inactive { background: #9CA3AF; }
+        
+        /* Photo Upload Styles */
+        .photo-upload-container {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .photo-preview-large {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #FFC107;
+            margin: 0 auto 15px;
+            display: none;
+        }
+        .photo-placeholder-large {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: #2D2D2D;
+            color: #9CA3AF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            margin: 0 auto 15px;
+            border: 4px dashed #444;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        .file-input-label {
+            padding: 10px 20px;
+            background: #FFC107;
+            color: #121212;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .file-input-label:hover {
+            background: #F5B301;
+            transform: translateY(-2px);
+        }
+        .worker-photo-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #FFC107;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content {
+            background: #1E1E1E;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            color: #F3F4F6;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .modal-title { font-size: 24px; font-weight: 700; color: #FFC107; }
+        .close-btn {
+            font-size: 28px;
+            color: #9CA3AF;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-btn:hover { color: #F3F4F6; }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #D1D5DB;
+            margin-bottom: 8px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #2D2D2D;
+            color: #F3F4F6;
+            transition: all 0.3s ease;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #FFC107;
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        .btn-cancel {
+            background: #2D2D2D;
+            color: #D1D5DB;
+            border: 1px solid #444;
+        }
+        .btn-cancel:hover { background: #333; }
+        .loading { text-align: center; padding: 20px; color: #9CA3AF; }
+        
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fa-solid fa-hard-hat"></i> Workers Management</h1>
+            <button class="btn btn-success" onclick="openAddModal()"><i class="fa-solid fa-plus"></i> Add Worker</button>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
+            <a href="cctv.html" class="nav-btn">CCTV Feeds</a>
+            <a href="violations.html" class="nav-btn">Violations</a>
+            <a href="attendance.html" class="nav-btn">Attendance</a>
+            <a href="salary.html" class="nav-btn">Salary & Fines</a>
+            <a href="workers.html" class="nav-btn active">Workers</a>
+            <a href="health.html" class="nav-btn">Health Alerts</a>
+        </nav>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+                <div class="stat-value" id="totalWorkers">...</div>
+                <div class="stat-label">Total Workers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                <div class="stat-value" id="activeWorkers">...</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-pause"></i></div>
+                <div class="stat-value" id="inactiveWorkers">...</div>
+                <div class="stat-label">Inactive</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-regular fa-calendar"></i></div>
+                <div class="stat-value" id="newWorkers">...</div>
+                <div class="stat-label">New This Month</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Worker Directory</h2>
+            </div>
+
+            <div class="search-filter">
+                <input type="text" class="search-input" placeholder="Search by ID, name, or phone..." id="searchWorkers" onkeyup="applyFilters()">
+                <select class="filter-select" id="departmentFilter" onchange="applyFilters()">
+                    <option value="">All Departments</option>
+                    <option value="Construction">Construction</option>
+                    <option value="Electrical">Electrical</option>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="Carpentry">Carpentry</option>
+                </select>
+                <select class="filter-select" id="statusFilter" onchange="applyFilters()">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div class="workers-grid" id="workersGrid">
+                <div class="loading">Loading workers data...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Worker Modal -->
+    <div id="workerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Add New Worker</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="workerForm" onsubmit="saveWorker(event)" enctype="multipart/form-data">
+                <input type="hidden" id="editMode" value="false">
+                <input type="hidden" id="originalWorkerId">
+                <input type="hidden" id="existingPhotoPath">
+                
+                <div class="webcam-capture-container" style="text-align: center; margin-bottom: 25px;">
+                    <video id="webcam" autoplay playsinline style="width: 250px; height: 250px; border-radius: 15px; border: 4px solid #667eea; object-fit: cover; margin-bottom: 15px; background: #e2e8f0; display: none; margin-left: auto; margin-right: auto;"></video>
+                    <img id="photoPreview" class="photo-preview-large" alt="Photo Preview" style="display:none; width: 250px; height: 250px; border-radius: 15px;">
+                    <div id="photoPlaceholder" class="photo-placeholder-large" style="width: 250px; height: 250px; border-radius: 15px; margin-left: auto; margin-right: auto;">📷</div>
+                    
+                    <div class="capture-controls" style="margin-bottom: 15px;">
+                        <button type="button" id="startCamBtn" class="btn btn-primary" onclick="startWebcam()">Start Camera</button>
+                        <button type="button" id="captureBtn" class="btn btn-success" style="display: none;" onclick="captureBurst()">📸 Capture Face (5 Photos)</button>
+                        <button type="button" id="retakeBtn" class="btn btn-cancel" style="display: none;" onclick="retakePhotos()">↻ Retake</button>
+                    </div>
+                    
+                    <div id="capturedThumbnails" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;"></div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Worker ID *</label>
+                        <input type="text" class="form-input" id="workerId" name="worker_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" class="form-input" id="workerName" name="name" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">CNIC *</label>
+                        <input type="text" class="form-input" id="workerCnic" name="cnic" placeholder="12345-1234567-1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-input" id="workerPhone" name="phone" placeholder="+92 300 1234567">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select class="form-select" id="workerDept" name="department">
+                        <option value="">Select Department</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Electrical">Electrical</option>
+                        <option value="Plumbing">Plumbing</option>
+                        <option value="Carpentry">Carpentry</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Wage Type *</label>
+                        <select class="form-select" id="wageType" name="wage_type" required>
+                            <option value="daily">Daily</option>
+                            <option value="hourly">Hourly</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Wage Rate (PKR) *</label>
+                        <input type="number" class="form-input" id="wageRate" name="wage_rate" step="0.01" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Join Date *</label>
+                        <input type="date" class="form-input" id="joinDate" name="join_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="workerStatus" name="status">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success" style="flex: 1;">Save Worker</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // ========== ADD THIS TO EVERY PAGE ==========
+    // Authentication check
+    window.addEventListener('load', () => {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token) {
+            // Not logged in, redirect to login
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        // User is logged in, display their name if there's a user display element
+        const userDisplay = document.getElementById('userDisplay');
+        if (userDisplay) {
+            userDisplay.textContent = user.full_name || 'User';
+        }
+    });
+    
+    // Logout function
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    }
+    // ========== END OF AUTH CODE ==========
+    </script>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api';
+        let allWorkers = [];
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/workers/stats/summary`);
+                const stats = await response.json();
+                
+                document.getElementById('totalWorkers').textContent = stats.total_workers || 0;
+                document.getElementById('activeWorkers').textContent = stats.active_workers || 0;
+                document.getElementById('inactiveWorkers').textContent = stats.inactive_workers || 0;
+                document.getElementById('newWorkers').textContent = stats.new_this_month || 0;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadWorkers() {
+            try {
+                const response = await fetch(`${API_BASE}/workers`);
+                allWorkers = await response.json();
+                displayWorkers(allWorkers);
+            } catch (error) {
+                console.error('Error loading workers:', error);
+                document.getElementById('workersGrid').innerHTML = '<div class="loading">Error loading workers data</div>';
+            }
+        }
+
+        function displayWorkers(workers) {
+            const grid = document.getElementById('workersGrid');
+            
+            if (workers.length === 0) {
+                grid.innerHTML = '<div class="loading">No workers found</div>';
+                return;
+            }
+            
+            grid.innerHTML = workers.map(w => {
+                const initial = w.name.charAt(0).toUpperCase();
+                const joinDate = new Date(w.join_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                // Display photo or placeholder
+                const photoElement = w.photo_path 
+                    ? `<img src="http://localhost:4000${w.photo_path}" class="worker-photo-img" alt="${w.name}">`
+                    : `<div class="worker-photo">${initial}</div>`;
+                
+                return `
+                    <div class="worker-card">
+                        <div class="status-indicator status-${w.status}" title="${w.status}"></div>
+                        <div class="worker-header">
+                            ${photoElement}
+                            <div class="worker-info">
+                                <div class="worker-name">${w.name}</div>
+                                <div class="worker-id">${w.worker_id}</div>
+                            </div>
+                        </div>
+                        <div class="worker-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">${w.phone || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">CNIC</span>
+                                <span class="detail-value">${w.cnic}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Wage Type</span>
+                                <span class="detail-value">${w.wage_type}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Wage Rate</span>
+                                <span class="detail-value">PKR ${w.wage_rate}/${w.wage_type === 'hourly' ? 'hr' : 'day'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Join Date</span>
+                                <span class="detail-value">${joinDate}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Department</span>
+                                <span class="detail-value">${w.department || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div class="worker-actions">
+                            <button class="action-btn action-edit" onclick='editWorker(${JSON.stringify(w)})'>✏️ Edit</button>
+                            <button class="action-btn action-delete" onclick="deleteWorker('${w.worker_id}', '${w.name}')">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchWorkers').value.toLowerCase();
+            const department = document.getElementById('departmentFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            const filtered = allWorkers.filter(w => {
+                const matchesSearch = !searchTerm || 
+                    w.name.toLowerCase().includes(searchTerm) || 
+                    w.worker_id.toLowerCase().includes(searchTerm) ||
+                    (w.phone && w.phone.includes(searchTerm));
+                
+                const matchesDepartment = !department || w.department === department;
+                const matchesStatus = !status || w.status === status;
+                
+                return matchesSearch && matchesDepartment && matchesStatus;
+            });
+            
+            displayWorkers(filtered);
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add New Worker';
+            document.getElementById('editMode').value = 'false';
+            document.getElementById('workerForm').reset();
+            document.getElementById('workerId').disabled = false;
+            document.getElementById('joinDate').value = new Date().toISOString().split('T')[0];
+            
+            // Reset photo preview and camera
+            stopWebcam();
+            retakePhotos();
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('photoPlaceholder').style.display = 'flex';
+            document.getElementById('startCamBtn').style.display = 'inline-block';
+            document.getElementById('existingPhotoPath').value = '';
+            
+            document.getElementById('workerModal').classList.add('active');
+        }
+
+        function editWorker(worker) {
+            document.getElementById('modalTitle').textContent = 'Edit Worker';
+            document.getElementById('editMode').value = 'true';
+            document.getElementById('originalWorkerId').value = worker.worker_id;
+            
+            document.getElementById('workerId').value = worker.worker_id;
+            document.getElementById('workerId').disabled = true;
+            document.getElementById('workerName').value = worker.name;
+            document.getElementById('workerCnic').value = worker.cnic;
+            document.getElementById('workerPhone').value = worker.phone || '';
+            document.getElementById('workerDept').value = worker.department || '';
+            document.getElementById('wageType').value = worker.wage_type;
+            document.getElementById('wageRate').value = worker.wage_rate;
+            document.getElementById('joinDate').value = worker.join_date.split('T')[0];
+            document.getElementById('workerStatus').value = worker.status;
+            
+            // Handle existing photo
+            stopWebcam();
+            retakePhotos();
+            if (worker.photo_path) {
+                const preview = document.getElementById('photoPreview');
+                preview.src = `http://localhost:4000${worker.photo_path}`;
+                preview.style.display = 'block';
+                document.getElementById('photoPlaceholder').style.display = 'none';
+                document.getElementById('startCamBtn').textContent = 'Replace Face Scan';
+                document.getElementById('startCamBtn').style.display = 'inline-block';
+                document.getElementById('existingPhotoPath').value = worker.photo_path;
+            } else {
+                document.getElementById('photoPreview').style.display = 'none';
+                document.getElementById('photoPlaceholder').style.display = 'flex';
+                document.getElementById('startCamBtn').textContent = 'Start Camera';
+                document.getElementById('startCamBtn').style.display = 'inline-block';
+                document.getElementById('existingPhotoPath').value = '';
+            }
+            
+            document.getElementById('workerModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('workerModal').classList.remove('active');
+            document.getElementById('workerForm').reset();
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('photoPlaceholder').style.display = 'flex';
+            stopWebcam();
+        }
+
+        let capturedPhotos = [];
+        let stream = null;
+
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('photoPlaceholder').style.display = 'none';
+                document.getElementById('photoPreview').style.display = 'none';
+                document.getElementById('startCamBtn').style.display = 'none';
+                document.getElementById('captureBtn').style.display = 'inline-block';
+                document.getElementById('retakeBtn').style.display = 'inline-block';
+                retakePhotos();
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                alert("Could not access camera. Please allow permissions.");
+            }
+        }
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            document.getElementById('webcam').style.display = 'none';
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('retakeBtn').style.display = 'none';
+        }
+
+        async function captureBurst() {
+            const video = document.getElementById('webcam');
+            const btn = document.getElementById('captureBtn');
+            btn.disabled = true;
+            btn.textContent = "Capturing...";
+            capturedPhotos = [];
+            document.getElementById('capturedThumbnails').innerHTML = '';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+
+            for(let i=0; i<5; i++) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                capturedPhotos.push(dataUrl);
+                
+                // Show thumbnail
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.style.width = '60px';
+                img.style.height = '60px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '8px';
+                img.style.border = '2px solid #fff';
+                document.getElementById('capturedThumbnails').appendChild(img);
+                
+                // Wait 400ms between captures to get slight variations
+                await new Promise(r => setTimeout(r, 400)); 
+            }
+            
+            btn.textContent = "✅ Captured 5 Photos";
+        }
+
+        function retakePhotos() {
+            capturedPhotos = [];
+            document.getElementById('capturedThumbnails').innerHTML = '';
+            const btn = document.getElementById('captureBtn');
+            btn.disabled = false;
+            btn.textContent = "📸 Capture Face (5 Photos)";
+        }
+
+        function previewPhoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('photoPreview');
+                    const placeholder = document.getElementById('photoPlaceholder');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function saveWorker(event) {
+            event.preventDefault();
+            
+            const isEditMode = document.getElementById('editMode').value === 'true';
+            const workerId = document.getElementById('workerId').value;
+            
+            if (!isEditMode && capturedPhotos.length === 0) {
+                alert("Please capture faces for the new worker via Webcam!");
+                return;
+            }
+
+            const payload = {
+                worker_id: workerId,
+                name: document.getElementById('workerName').value,
+                cnic: document.getElementById('workerCnic').value,
+                phone: document.getElementById('workerPhone').value,
+                department: document.getElementById('workerDept').value,
+                wage_type: document.getElementById('wageType').value,
+                wage_rate: document.getElementById('wageRate').value,
+                join_date: document.getElementById('joinDate').value,
+                status: document.getElementById('workerStatus').value,
+                photos: capturedPhotos,
+                existing_photo_path: document.getElementById('existingPhotoPath').value
+            };
+
+            try {
+                let response;
+                if (isEditMode) {
+                    const originalId = document.getElementById('originalWorkerId').value;
+                    response = await fetch(`${API_BASE}/workers/${originalId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    response = await fetch(`${API_BASE}/workers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(isEditMode ? 'Worker updated successfully!' : 'Worker added successfully!');
+                    closeModal();
+                    loadWorkers();
+                    loadStats();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error saving worker:', error);
+                alert('Failed to save worker. Please try again.');
+            }
+        }
+
+        async function deleteWorker(workerId, workerName) {
+            if (!confirm(`Are you sure you want to delete ${workerName} (${workerId})?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/workers/${workerId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('Worker deleted successfully!');
+                    loadWorkers();
+                    loadStats();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error deleting worker:', error);
+                alert('Failed to delete worker. Please try again.');
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('workerModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Initialize
+        loadStats();
+        loadWorkers();
+
+        // Refresh every 60 seconds
+        setInterval(() => {
+            loadStats();
+            loadWorkers();
+        }, 60000);
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

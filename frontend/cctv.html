@@ -1,0 +1,441 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Live Feed</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .header {
+            background: #1E1E1E;
+            padding: 20px 30px;
+            border: 1px solid #333;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #FFC107;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .camera-title {
+            color: #9CA3AF;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .status-badge {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge.live {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 500px;
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 900px;
+            background: #1E1E1E;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+        }
+
+        .camera-feed {
+            position: relative;
+            background: #000;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .feed-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.6) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .feed-placeholder {
+            position: absolute;
+            color: #9CA3AF;
+            font-size: 18px;
+            text-align: center;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #1E1E1E !important;
+            width: 100%;
+            height: 100%;
+        }
+
+        .feed-placeholder.hidden {
+            display: none;
+        }
+
+        .feed-placeholder .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .live-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 3;
+        }
+
+        .timestamp {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #FFC107;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            z-index: 3;
+            border: 1px solid #333;
+        }
+
+        .camera-info-bar {
+            background: #1E1E1E;
+            padding: 20px 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            border-top: 1px solid #333;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .info-label {
+            color: #9CA3AF;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            color: #F3F4F6;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 193, 7, 0.2);
+            color: #FFC107;
+            border: 1px solid #FFC107;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: fit-content;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                min-height: 300px;
+            }
+
+            .video-container {
+                max-width: 100%;
+            }
+
+            .camera-info-bar {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+                padding: 15px 20px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">
+                <i class="fa-solid fa-video"></i> CCTV Live
+            </div>
+            <div class="camera-title">Camera 1 - Main Entrance</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <select id="cameraSelect" style="padding: 8px 14px; background: rgba(30,41,59,0.8); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                <option value="0">Laptop Webcam</option>
+                <option value="imou">Imou CCTV Camera</option>
+            </select>
+            <div class="status-badge" id="statusBadge">
+                <span class="recording-dot"></span>
+                CONNECTING
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="video-container">
+            <div class="camera-feed" style="background:#000;">
+                <div class="live-indicator" style="z-index: 10;">
+                    <span class="recording-dot" style="animation: pulse 1s infinite;"></span>
+                    AI OVERLAY ACTIVE
+                </div>
+                <div class="timestamp" id="timestamp" style="z-index: 10;">00:00:00</div>
+                
+                <!-- MJPEG Native Stream injected directly from Python -->
+                <img id="videoPlayer" src="http://127.0.0.1:5001/video_feed" style="width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0;" onerror="handleStreamError()" />
+                
+                <div class="feed-placeholder" id="loadingPlaceholder">
+                    <div class="icon"><i class="fa-solid fa-robot"></i></div>
+                    <div id="statusText" style="color: #FFC107; font-weight:bold;">Initializing Dual AI Stream...</div>
+                    <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Please ensure `intelligent_cctv.py` is running</div>
+                </div>
+            </div>
+            
+            <div class="camera-info-bar">
+                <div class="info-item">
+                    <div class="info-label">Location</div>
+                    <div class="info-value">Main Gate Entry</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Resolution</div>
+                    <div class="info-value">1920×1080 HD</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">YOLO Tracking</div>
+                    <div class="info-value">Smooth Sync</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">AI Status</div>
+                    <div class="info-value">
+                        <span class="ai-badge" id="aiStatusBadge"><i class="fa-solid fa-bolt"></i> ONLINE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ========== AUTH CHECK ==========
+    window.addEventListener('load', () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+            return;
+        }
+    });
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    }
+    // ========== END AUTH ==========
+    </script>
+
+    <script>
+        function updateTimestamp() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('timestamp').textContent = timeString;
+        }
+
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        const img = document.getElementById('videoPlayer');
+        const placeholder = document.getElementById('loadingPlaceholder');
+        const statusBadge = document.getElementById('statusBadge');
+        const cameraSelect = document.getElementById('cameraSelect');
+        
+        // Load current camera setting from Python backend
+        fetch('http://127.0.0.1:5001/get_camera')
+            .then(r => r.json())
+            .then(data => { cameraSelect.value = data.camera; })
+            .catch(() => {});
+
+        // Camera switch handler
+        cameraSelect.addEventListener('change', async () => {
+            const source = cameraSelect.value;
+            statusBadge.className = 'status-badge';
+            statusBadge.innerHTML = '<span class="recording-dot"></span> SWITCHING...';
+            
+            try {
+                await fetch('http://127.0.0.1:5001/set_camera', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: source })
+                });
+                // Reload the MJPEG stream with a cache-busting param
+                img.src = 'http://127.0.0.1:5001/video_feed?' + new Date().getTime();
+            } catch(e) {
+                console.error('Camera switch failed:', e);
+            }
+        });
+
+        // Hide placeholder once stream successfully loads a frame
+        img.onload = function() {
+            placeholder.classList.add('hidden');
+            statusBadge.className = 'status-badge live';
+            statusBadge.innerHTML = '<span class="recording-dot"></span> LIVE AI FEED';
+        };
+
+        function handleStreamError() {
+            img.style.display = 'none';
+            placeholder.classList.remove('hidden');
+            document.getElementById('statusText').innerHTML = "Cannot connect to Stream.<br>Run <code>python intelligent_cctv.py</code>";
+            document.getElementById('statusText').style.color = '#ef4444';
+            statusBadge.className = 'status-badge';
+            statusBadge.innerHTML = '<span class="recording-dot" style="background:#ef4444;"></span> OFFLINE';
+            
+            // Try to reconnect every 3 seconds
+            setTimeout(() => {
+                img.style.display = 'block';
+                img.src = "http://127.0.0.1:5001/video_feed?" + new Date().getTime();
+            }, 3000);
+        }
+        // --- Tab Visibility & Camera Cleanup Logic ---
+        function notifyCameraState(active) {
+            if (active) {
+                fetch('http://127.0.0.1:5001/start_camera', {method: 'POST'}).catch(()=>{});
+            } else {
+                fetch('http://127.0.0.1:5001/stop_camera', {method: 'POST', keepalive: true}).catch(()=>{});
+            }
+        }
+
+        // Request camera when page loads
+        notifyCameraState(true);
+
+        // Handle tab switching
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                notifyCameraState(false);
+            } else {
+                notifyCameraState(true);
+            }
+        });
+
+        // Handle navigation/closing
+        window.addEventListener('beforeunload', () => {
+            notifyCameraState(false);
+        });
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

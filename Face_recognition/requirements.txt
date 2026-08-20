@@ -1,0 +1,22 @@
+# --- STANDARD DEPENDENCIES ---
+opencv-python
+tqdm
+flask
+flask-cors
+ultralytics
+pandas
+imageio-ffmpeg
+setuptools<70.0.0
+numpy<2
+
+# --- FAST FACIAL RECOGNITION ---
+# Note: For Windows, it is highly recommended to install the pre-compiled dlib wheel
+# before running `pip install -r requirements.txt` to avoid Visual Studio C++ compiler errors.
+dlib
+face_recognition
+
+# --- GPU ACCELERATION (OPTIONAL) ---
+# If you have an NVIDIA GPU, run these commands manually:
+#
+# 1. For YOLO GPU Support:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121

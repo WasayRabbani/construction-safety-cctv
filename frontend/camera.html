@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Live Feeds</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1500px; margin: 0 auto; }
+        .header {
+            background: #1E1E1E;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header h1 { color: #FFC107; font-size: 26px; font-weight: 700; }
+        .header h1 i { margin-right: 8px; }
+        .btn {
+            padding: 12px 22px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #FFC107; color: #121212; }
+        .btn-primary:hover { transform: translateY(-2px); background: #F5B301; box-shadow: 0 4px 12px rgba(255,193,7,0.3); }
+        .btn-danger { background: rgba(245,101,101,0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .btn-danger:hover { background: rgba(245,101,101,0.4); }
+        .btn-secondary { background: #2D2D2D; color: #D1D5DB; border: 1px solid #444; }
+        .btn-secondary:hover { background: #333; }
+
+        .nav-menu {
+            background: #1E1E1E;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: transparent;
+            color: #D1D5DB;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nav-btn:hover { transform: translateY(-2px); background: #333; }
+        .nav-btn.active { background: #FFC107; color: #121212; border-color: #FFC107; font-weight: 700; }
+
+        .cameras-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 24px;
+        }
+        .camera-card {
+            background: #1E1E1E;
+            border: 1px solid #333;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .camera-feed {
+            position: relative;
+            background: #000;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .camera-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .camera-feed .placeholder {
+            color: #9CA3AF;
+            text-align: center;
+            font-size: 13px;
+        }
+        .camera-feed .placeholder .icon { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+
+        .live-tag {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 5;
+        }
+        .live-tag.online { background: rgba(34,197,94,0.9); color: #06210f; }
+        .live-tag.connecting, .live-tag.reconnecting { background: rgba(237,137,54,0.9); color: #331a02; }
+        .live-tag.error { background: rgba(239,68,68,0.9); color: #fff; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,50%{opacity:1;} 51%,100%{opacity:0.3;} }
+
+        .camera-info {
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .camera-name { font-size: 15px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px; }
+        .camera-meta { font-size: 12px; color: #9CA3AF; }
+        .camera-counts { display: flex; gap: 8px; }
+        .count-chip {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .count-safe { background: rgba(72,187,120,0.2); color: #68d391; border: 1px solid #68d391; }
+        .count-viol { background: rgba(245,101,101,0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .delete-btn {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: rgba(245,101,101,0.15); color: #fc8181; border: 1px solid #fc8181;
+            cursor: pointer; font-size: 13px; flex-shrink: 0;
+        }
+        .delete-btn:hover { background: rgba(245,101,101,0.35); }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: #9CA3AF;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            align-items: center; justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: #1E1E1E; border: 1px solid #333; border-radius: 12px;
+            padding: 30px; max-width: 460px; width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 22px; padding-bottom: 15px; border-bottom: 1px solid #333;
+        }
+        .modal-title { font-size: 20px; font-weight: 700; color: #FFC107; }
+        .close-btn { font-size: 24px; color: #9CA3AF; background: none; border: none; cursor: pointer; }
+        .close-btn:hover { color: #F3F4F6; }
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; color: #D1D5DB; margin-bottom: 8px; }
+        .form-input {
+            width: 100%; padding: 12px 15px; border: 1px solid #444; border-radius: 8px;
+            font-size: 14px; background: #2D2D2D; color: #F3F4F6;
+        }
+        .form-input:focus { outline: none; border-color: #FFC107; box-shadow: 0 0 0 2px rgba(255,193,7,0.2); }
+        .form-hint { font-size: 11.5px; color: #6B7280; margin-top: 6px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+        .modal-actions .btn { flex: 1; }
+        .form-error {
+            background: rgba(245,101,101,0.1); border-left: 4px solid #f56565; color: #fc8181;
+            padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none;
+        }
+        .form-error.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fa-solid fa-video"></i> CCTV Live Feeds</h1>
+            <button class="btn btn-primary" onclick="openAddModal()"><i class="fa-solid fa-plus"></i> Add Camera</button>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
+            <a href="cctv.html" class="nav-btn active">CCTV Feeds</a>
+            <a href="violations.html" class="nav-btn">Violations</a>
+            <a href="attendance.html" class="nav-btn">Attendance</a>
+            <a href="salary.html" class="nav-btn">Salary & Fines</a>
+            <a href="workers.html" class="nav-btn">Workers</a>
+            <a href="health.html" class="nav-btn">Health Alerts</a>
+            <a href="face-recognition.html" class="nav-btn">Face Recognition</a>
+        </nav>
+
+        <div class="cameras-grid" id="camerasGrid">
+            <div class="empty-state"><div class="icon"><i class="fa-solid fa-video-slash"></i></div>Loading cameras...</div>
+        </div>
+    </div>
+
+    <!-- Add Camera Modal -->
+    <div id="addCameraModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fa-solid fa-video"></i> Add Camera</div>
+                <button class="close-btn" onclick="closeAddModal()">&times;</button>
+            </div>
+
+            <div class="form-error" id="addCameraError"></div>
+
+            <form id="addCameraForm" onsubmit="submitAddCamera(event)">
+                <div class="form-group">
+                    <label class="form-label">Camera Name</label>
+                    <input type="text" class="form-input" id="camName" placeholder="e.g. Zone B - North Gate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">RTSP Link</label>
+                    <input type="text" class="form-input" id="camRtsp" placeholder="rtsp://admin:password@192.168.1.50:554/cam/realmonitor?channel=1&subtype=0" required>
+                    <div class="form-hint">Also accepts a webcam index (0, 1...) or an HTTP MJPEG URL.</div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="addCameraBtn">Add & Start Camera</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // ========== AUTH CHECK ==========
+    window.addEventListener('load', () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+            return;
+        }
+    });
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    }
+    // ========== END AUTH ==========
+    </script>
+
+    <script>
+        // The Python AI/CCTV server (intelligent_cctv.py)
+        const AI_BASE = 'http://127.0.0.1:5001';
+
+        async function loadCameras() {
+            try {
+                const res = await fetch(`${AI_BASE}/cameras`);
+                const cams = await res.json();
+                renderCameras(cams);
+            } catch (err) {
+                console.error('Error loading cameras:', err);
+                document.getElementById('camerasGrid').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        Cannot reach the AI server at ${AI_BASE}.<br>
+                        Make sure <code>python intelligent_cctv.py</code> is running.
+                    </div>`;
+            }
+        }
+
+        function renderCameras(cams) {
+            const grid = document.getElementById('camerasGrid');
+
+            if (!cams || cams.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fa-solid fa-video-slash"></i></div>
+                        No cameras yet. Click "Add Camera" to start monitoring a feed.
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = cams.map(cam => {
+                const statusClass = cam.status || 'connecting';
+                const statusLabel = {
+                    online: 'LIVE', connecting: 'CONNECTING', reconnecting: 'RECONNECTING', error: 'ERROR'
+                }[statusClass] || statusClass.toUpperCase();
+
+                return `
+                    <div class="camera-card">
+                        <div class="camera-feed">
+                            <div class="live-tag ${statusClass}"><span class="dot"></span> ${statusLabel}</div>
+                            <img src="${AI_BASE}/video_feed/${cam.id}"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="placeholder" style="display:none; flex-direction:column; align-items:center; justify-content:center; position:absolute; inset:0;">
+                                <div class="icon"><i class="fa-solid fa-video-slash"></i></div>
+                                Stream unavailable
+                            </div>
+                        </div>
+                        <div class="camera-info">
+                            <div>
+                                <div class="camera-name">${escapeHtml(cam.name)}</div>
+                                <div class="camera-meta">${escapeHtml(cam.source)}</div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="camera-counts">
+                                    <span class="count-chip count-safe">${cam.safe_count} OK</span>
+                                    <span class="count-chip count-viol">${cam.viol_count} VIOL</span>
+                                </div>
+                                <button class="delete-btn" title="Delete camera" onclick="deleteCamera('${cam.id}', '${escapeHtml(cam.name)}')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function deleteCamera(camId, camName) {
+            if (camId === 'default') {
+                alert('The default camera cannot be deleted from here.');
+                return;
+            }
+            if (!confirm(`Remove camera "${camName}"? This stops its stream immediately.`)) return;
+
+            try {
+                const res = await fetch(`${AI_BASE}/cameras/${camId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    loadCameras();
+                } else {
+                    alert('Error: ' + (data.error || 'Could not delete camera'));
+                }
+            } catch (err) {
+                console.error('Delete camera error:', err);
+                alert('Could not reach the AI server to delete the camera.');
+            }
+        }
+
+        function openAddModal() {
+            document.getElementById('addCameraForm').reset();
+            document.getElementById('addCameraError').classList.remove('show');
+            document.getElementById('addCameraModal').classList.add('active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addCameraModal').classList.remove('active');
+        }
+
+        async function submitAddCamera(event) {
+            event.preventDefault();
+            const name = document.getElementById('camName').value.trim();
+            const rtsp = document.getElementById('camRtsp').value.trim();
+            const errorBox = document.getElementById('addCameraError');
+            const btn = document.getElementById('addCameraBtn');
+
+            errorBox.classList.remove('show');
+            btn.disabled = true;
+            btn.textContent = 'Connecting...';
+
+            try {
+                const res = await fetch(`${AI_BASE}/cameras/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, rtsp_url: rtsp })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    closeAddModal();
+                    loadCameras();
+                } else {
+                    errorBox.textContent = data.error || 'Failed to add camera';
+                    errorBox.classList.add('show');
+                }
+            } catch (err) {
+                console.error('Add camera error:', err);
+                errorBox.textContent = `Could not reach the AI server at ${AI_BASE}. Is intelligent_cctv.py running?`;
+                errorBox.classList.add('show');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add & Start Camera';
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('addCameraModal');
+            if (event.target === modal) closeAddModal();
+        };
+
+        // Initialize
+        loadCameras();
+        setInterval(loadCameras, 10000); // refresh statuses/counts every 10s
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

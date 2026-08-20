@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary & Fines Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header {
+            background: #1E1E1E;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #FFC107; font-size: 28px; font-weight: 700; margin-bottom: 15px; }
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .nav-menu {
+            background: #1E1E1E;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: transparent;
+            color: #D1D5DB;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nav-btn:hover { transform: translateY(-2px); background: #333; }
+        .nav-btn.active { background: #FFC107; color: #121212; border-color: #FFC107; font-weight: 700; }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+        }
+        .tab-btn {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: #9CA3AF;
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-btn.active {
+            color: #FFC107;
+            border-bottom-color: #FFC107;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: #1E1E1E;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+        }
+        .summary-card.gross::before { background: #4fd1c5; }
+        .summary-card.fines::before { background: #fc8181; }
+        .summary-card.net::before { background: #68d391; }
+        .summary-label { color: #9CA3AF; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
+        .summary-value { color: #F3F4F6; font-size: 24px; font-weight: 700; }
+        
+        .card {
+            background: #1E1E1E;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .card-title { color: #FFC107; font-size: 20px; font-weight: 700; }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #FFC107; color: #121212; }
+        .btn-primary:hover { transform: translateY(-2px); background: #F5B301; }
+        .btn-secondary { background: #2D2D2D; color: #D1D5DB; border: 1px solid #444; }
+        .btn-secondary:hover { background: #333; }
+        .btn-small { padding: 8px 16px; font-size: 12px; }
+        
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .input-field {
+            padding: 10px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #2D2D2D;
+            color: #F3F4F6;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #FFC107;
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        }
+        
+        .table-wrapper { overflow-x: auto; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table thead {
+            background: #FFC107;
+            color: #121212;
+        }
+        .data-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            color: #D1D5DB;
+        }
+        .data-table tbody tr:hover { background: #2D2D2D; }
+        
+        .amount-positive { color: #68d391; font-weight: 700; }
+        .amount-negative { color: #fc8181; font-weight: 700; }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-paid { background: rgba(72, 187, 120, 0.2); color: #68d391; border: 1px solid #68d391; }
+        .badge-pending { background: rgba(237, 137, 54, 0.2); color: #f6ad55; border: 1px solid #f6ad55; }
+        .badge-processing { background: rgba(66, 153, 225, 0.2); color: #63b3ed; border: 1px solid #63b3ed; }
+        .badge-violation { background: rgba(245, 101, 101, 0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .badge-absence { background: rgba(221, 107, 32, 0.2); color: #ed8936; border: 1px solid #ed8936; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .action-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #2D2D2D;
+            color: #D1D5DB;
+            border: 1px solid #444;
+            transition: all 0.3s ease;
+        }
+        .action-btn:hover { background: #333; color: #FFC107; border-color: #FFC107; }
+        
+        .hidden { display: none; }
+        .loading { text-align: center; padding: 30px; color: #9CA3AF; }
+        
+        @media (max-width: 768px) {
+            .header-controls { flex-direction: column; }
+            .filter-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fa-solid fa-money-bill"></i> Salary & Fines Management</h1>
+            <div class="header-controls">
+                <label style="color: #4a5568; font-weight: 600;">Select Month:</label>
+                <input type="month" id="payPeriod" class="input-field">
+                <button class="btn btn-primary" onclick="loadData()"><i class="fa-solid fa-chart-bar"></i> Load</button>
+                <button class="btn btn-secondary" onclick="generatePayroll()"><i class="fa-solid fa-rotate"></i> Generate Payroll</button>
+            </div>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
+            <a href="cctv.html" class="nav-btn"><i class="fa-solid fa-video"></i> CCTV</a>
+            <a href="violations.html" class="nav-btn"><i class="fa-solid fa-triangle-exclamation"></i> Violations</a>
+            <a href="attendance.html" class="nav-btn"><i class="fa-solid fa-clipboard-check"></i> Attendance</a>
+            <a href="salary.html" class="nav-btn active"><i class="fa-solid fa-money-bill"></i> Salary</a>
+            <a href="workers.html" class="nav-btn"><i class="fa-solid fa-hard-hat"></i> Workers</a>
+            <a href="health.html" class="nav-btn"><i class="fa-solid fa-truck-medical"></i> Health</a>
+        </nav>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('salary')"><i class="fa-solid fa-money-bill-wave"></i> Salary Breakdown</button>
+            <button class="tab-btn" onclick="switchTab('fines')"><i class="fa-solid fa-triangle-exclamation"></i> Fines Details</button>
+            <button class="tab-btn" onclick="switchTab('summary')"><i class="fa-solid fa-chart-bar"></i> Summary</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid" id="summaryCards"></div>
+
+        <!-- SALARY TAB -->
+        <div id="salary-tab" class="card">
+            <div class="card-header">
+                <h2 class="card-title">Salary Records</h2>
+                <div class="filter-group">
+                    <select id="statusFilter" class="input-field" onchange="loadData()">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                    <button class="btn btn-secondary btn-small" onclick="markAllPaid()">✓ Mark All Paid</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportCSV()"><i class="fa-solid fa-download"></i> Export</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Worker</th>
+                            <th>Days/Hrs</th>
+                            <th>Gross</th>
+                            <th>Violations</th>
+                            <th>Absence</th>
+                            <th>Late</th>
+                            <th>Total Fines</th>
+                            <th>Tax</th>
+                            <th>Net</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salaryTableBody" class="loading">Loading...</tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FINES TAB -->
+        <div id="fines-tab" class="card hidden">
+            <div class="card-header">
+                <h2 class="card-title">Fines Breakdown</h2>
+                <div class="filter-group">
+                    <select id="fineTypeFilter" class="input-field" onchange="loadFines()">
+                        <option value="">All Types</option>
+                        <option value="violation">Violation</option>
+                        <option value="absence">Absence</option>
+                        <option value="late">Late Arrival</option>
+                    </select>
+                    <select id="fineStatusFilter" class="input-field" onchange="loadFines()">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="deducted">Deducted</option>
+                        <option value="waived">Waived</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Worker</th>
+                            <th>Fine Type</th>
+                            <th>Amount (PKR)</th>
+                            <th>Description</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="finesTableBody" class="loading">Loading...</tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SUMMARY TAB -->
+        <div id="summary-tab" class="card hidden">
+            <h2 class="card-title" style="margin-bottom: 20px;">Monthly Summary</h2>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Workers</th>
+                            <th>Total Gross</th>
+                            <th>Total Fines</th>
+                            <th>Total Net</th>
+                            <th>Paid</th>
+                            <th>Pending</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody" class="loading">Loading...</tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api';
+        
+        // Auth check
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('token');
+            if (!token) window.location.href = 'login.html';
+            
+            const today = new Date();
+            document.getElementById('payPeriod').value = today.toISOString().slice(0, 7);
+            loadData();
+        });
+
+        function switchTab(tab) {
+            document.querySelectorAll('[id$="-tab"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tab + '-tab').classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'fines') loadFines();
+            else if (tab === 'summary') loadSummary();
+        }
+
+        async function loadData() {
+            try {
+                const period = document.getElementById('payPeriod').value;
+                const status = document.getElementById('statusFilter').value;
+                
+                let url = `${API_BASE}/salary?pay_period=${period}`;
+                if (status) url += `&status=${status}`;
+                
+                const response = await fetch(url);
+                const salaries = await response.json();
+                
+                displaySalaries(salaries);
+                updateSummary(salaries);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('salaryTableBody').innerHTML = '<tr><td colspan="11" class="loading">Error loading data</td></tr>';
+            }
+        }
+
+        function displaySalaries(salaries) {
+            const tbody = document.getElementById('salaryTableBody');
+            
+            if (!salaries || salaries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11" class="loading">No records found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = salaries.map(s => `
+                <tr>
+                    <td><strong>${s.worker_id}</strong><br><small>${s.name}</small></td>
+                    <td>${s.wage_type === 'daily' ? s.days_worked + ' d' : s.hours_worked + ' h'}</td>
+                    <td class="amount-positive">PKR ${s.gross_salary.toLocaleString()}</td>
+                    <td class="amount-negative">-${(s.violation_fines || 0).toLocaleString()}</td>
+                    <td class="amount-negative">-${(s.absence_fines || 0).toLocaleString()}</td>
+                    <td class="amount-negative">-${(s.late_fines || 0).toLocaleString()}</td>
+                    <td class="amount-negative"><strong>-${(s.total_fines || 0).toLocaleString()}</strong></td>
+                    <td>-${(s.tax_deduction || 0).toLocaleString()}</td>
+                    <td class="amount-positive"><strong>PKR ${s.net_salary.toLocaleString()}</strong></td>
+                    <td><span class="badge badge-${s.status}">${s.status.toUpperCase()}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="viewDetails('${s.worker_id}', '${s.name}', ${s.gross_salary}, ${s.total_fines}, ${s.net_salary})">👁️</button>
+                            ${s.status !== 'paid' ? `<button class="action-btn" onclick="markPaid(${s.salary_id})">✓</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadFines() {
+            try {
+                const type = document.getElementById('fineTypeFilter').value;
+                const status = document.getElementById('fineStatusFilter').value;
+                
+                // Mock data - Replace with actual API when backend ready
+                const fines = [
+                    { fine_id: 1, worker_id: 'W001', name: 'Ahmad Ali', fine_type: 'violation', fine_amount: 200, description: 'Missing gloves', fine_date: new Date().toISOString().split('T')[0], status: 'pending' },
+                    { fine_id: 2, worker_id: 'W002', name: 'Hassan Khan', fine_type: 'violation', fine_amount: 300, description: 'Missing vest', fine_date: new Date().toISOString().split('T')[0], status: 'pending' },
+                    { fine_id: 3, worker_id: 'W003', name: 'Bilal Ahmed', fine_type: 'violation', fine_amount: 500, description: 'Missing helmet', fine_date: new Date().toISOString().split('T')[0], status: 'pending' },
+                    { fine_id: 4, worker_id: 'W003', name: 'Bilal Ahmed', fine_type: 'late', fine_amount: 100, description: 'Late arrival - 30 min', fine_date: new Date().toISOString().split('T')[0], status: 'pending' },
+                    { fine_id: 5, worker_id: 'W004', name: 'Usman Tariq', fine_type: 'absence', fine_amount: 500, description: 'Absent on duty', fine_date: new Date(Date.now() - 86400000).toISOString().split('T')[0], status: 'deducted' }
+                ];
+                
+                const tbody = document.getElementById('finesTableBody');
+                tbody.innerHTML = fines.map(f => `
+                    <tr>
+                        <td><strong>${f.worker_id}</strong><br><small>${f.name}</small></td>
+                        <td><span class="badge badge-${f.fine_type}">${f.fine_type.toUpperCase()}</span></td>
+                        <td class="amount-negative">PKR ${f.fine_amount.toLocaleString()}</td>
+                        <td>${f.description}</td>
+                        <td>${f.fine_date}</td>
+                        <td><span class="badge badge-${f.status}">${f.status.toUpperCase()}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                ${f.status !== 'deducted' ? `<button class="action-btn" onclick="deductFine(${f.fine_id})">Deduct</button>` : ''}
+                                <button class="action-btn" onclick="waiveFine(${f.fine_id})">Waive</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading fines:', error);
+            }
+        }
+
+        async function loadSummary() {
+            try {
+                // Mock data - Replace with API
+                const summary = [
+                    { month: '2024-12', workers: 4, gross: 39500, fines: 1600, net: 37900, paid: 1, pending: 3 },
+                    { month: '2024-11', workers: 4, gross: 41800, fines: 300, net: 41500, paid: 4, pending: 0 }
+                ];
+                
+                const tbody = document.getElementById('summaryTableBody');
+                tbody.innerHTML = summary.map(s => `
+                    <tr>
+                        <td><strong>${s.month}</strong></td>
+                        <td>${s.workers}</td>
+                        <td>PKR ${s.gross.toLocaleString()}</td>
+                        <td class="amount-negative">-PKR ${s.fines.toLocaleString()}</td>
+                        <td class="amount-positive"><strong>PKR ${s.net.toLocaleString()}</strong></td>
+                        <td><span class="badge badge-paid">${s.paid}</span></td>
+                        <td><span class="badge badge-pending">${s.pending}</span></td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading summary:', error);
+            }
+        }
+
+        function updateSummary(salaries) {
+            if (!salaries || salaries.length === 0) return;
+            
+            const totalGross = salaries.reduce((sum, s) => sum + (s.gross_salary || 0), 0);
+            const totalFines = salaries.reduce((sum, s) => sum + (s.total_fines || 0), 0);
+            const totalNet = salaries.reduce((sum, s) => sum + (s.net_salary || 0), 0);
+            
+            const html = `
+                <div class="summary-card gross">
+                    <div class="summary-label">Total Gross Salary</div>
+                    <div class="summary-value">PKR ${totalGross.toLocaleString()}</div>
+                </div>
+                <div class="summary-card fines">
+                    <div class="summary-label">Total Fines</div>
+                    <div class="summary-value">PKR ${totalFines.toLocaleString()}</div>
+                </div>
+                <div class="summary-card net">
+                    <div class="summary-label">Net Payable</div>
+                    <div class="summary-value">PKR ${totalNet.toLocaleString()}</div>
+                </div>
+                <div class="summary-card gross">
+                    <div class="summary-label">Average per Worker</div>
+                    <div class="summary-value">PKR ${(totalNet / salaries.length).toLocaleString()}</div>
+                </div>
+            `;
+            document.getElementById('summaryCards').innerHTML = html;
+        }
+
+        function viewDetails(id, name, gross, fines, net) {
+            alert(`${id} - ${name}\n\nGross: PKR ${gross.toLocaleString()}\nFines: PKR ${fines.toLocaleString()}\nNet: PKR ${net.toLocaleString()}`);
+        }
+
+        async function markPaid(salaryId) {
+            if (!confirm('Mark as paid?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/salary/${salaryId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'paid' })
+                });
+                if (response.ok) loadData();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function markAllPaid() {
+            if (confirm('Mark all as paid?')) {
+                alert('Mark all as paid - Backend implementation needed');
+                loadData();
+            }
+        }
+
+        function deductFine(fineId) {
+            if (confirm('Deduct this fine?')) {
+                alert('Fine deducted - Backend implementation needed');
+                loadFines();
+            }
+        }
+
+        function waiveFine(fineId) {
+            if (confirm('Waive this fine?')) {
+                alert('Fine waived - Backend implementation needed');
+                loadFines();
+            }
+        }
+
+        function generatePayroll() {
+            alert('Generate payroll for: ' + document.getElementById('payPeriod').value);
+        }
+
+        function exportCSV() {
+            alert('Exporting salary data...');
+        }
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

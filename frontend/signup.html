@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Construction Safety</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .signup-container {
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .signup-box {
+            background: #1E1E1E;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 50px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .logo-title {
+            color: #FFC107;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .logo-subtitle {
+            color: #9CA3AF;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            color: #D1D5DB;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background: #2D2D2D;
+            color: #F3F4F6;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #FFC107;
+            background: #222;
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: #6B7280;
+        }
+
+        .signup-btn {
+            width: 100%;
+            padding: 16px;
+            background: #FFC107;
+            color: #121212;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 30px 0 20px 0;
+        }
+
+        .signup-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(255, 193, 7, 0.3);
+            background: #F5B301;
+        }
+
+        .signup-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: rgba(245, 101, 101, 0.1);
+            border-left: 4px solid #f56565;
+            color: #fc8181;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: shake 0.3s ease-out;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: rgba(72, 187, 120, 0.1);
+            border-left: 4px solid #48bb78;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+
+        .login-link {
+            text-align: center;
+            color: #9CA3AF;
+            font-size: 14px;
+        }
+
+        .login-link a {
+            color: #FFC107;
+            text-decoration: none;
+            font-weight: 700;
+            transition: color 0.3s ease;
+        }
+
+        .login-link a:hover {
+            color: #F5B301;
+            text-decoration: underline;
+        }
+
+        .requirements {
+            background: #2D2D2D;
+            border-left: 4px solid #FFC107;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #D1D5DB;
+        }
+
+        .requirements-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #F3F4F6;
+        }
+
+        .requirement-item {
+            padding: 3px 0;
+        }
+
+        .requirement-item.met {
+            color: #48bb78;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(18, 18, 18, 0.3);
+            border-radius: 50%;
+            border-top-color: #121212;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .btn-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 480px) {
+            .signup-box {
+                padding: 35px 25px;
+            }
+
+            .logo-title {
+                font-size: 24px;
+            }
+
+            .logo {
+                font-size: 40px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="signup-container">
+        <div class="signup-box">
+            <div class="logo-section">
+                <div class="logo"><i class="fa-solid fa-helmet-safety"></i></div>
+                <div class="logo-title">Create Account</div>
+                <div class="logo-subtitle">Join Construction Safety System</div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+
+            <form id="signupForm" onsubmit="handleSignup(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="fullname">Full Name</label>
+                        <input type="text" id="fullname" name="full_name" class="form-input" placeholder="Your name"
+                            required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="username">Username</label>
+                        <input type="text" id="username" name="username" class="form-input"
+                            placeholder="Choose username" required minlength="3">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-input"
+                        placeholder="At least 6 characters" required minlength="6"
+                        oninput="checkPasswordRequirements()">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" name="confirm_password" class="form-input"
+                        placeholder="Confirm password" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="department">Department</label>
+                    <select id="department" name="department" class="form-input" required>
+                        <option value="">Select Department</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Electrical">Electrical</option>
+                        <option value="Plumbing">Plumbing</option>
+                        <option value="Carpentry">Carpentry</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="role">User Role</label>
+                    <select id="role" name="role" class="form-input" required>
+                        <option value="">Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="safety officer">Safety Officer</option>
+                        <option value="hr">HR</option>
+                        <option value="monitor">Monitor</option>
+                        <option value="accounts">Accounts</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="worker">Worker</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="adminUsername">Admin Username</label>
+                    <input type="text" id="adminUsername" class="form-input" placeholder="Administrator username" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="adminPassword">Admin Password</label>
+                    <input type="password" id="adminPassword" class="form-input" placeholder="Administrator password" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" class="form-input" placeholder="+92 300 1234567">
+                </div>
+
+                <button type="submit" class="signup-btn" id="signupBtn">
+                    <div class="btn-content">
+                        <div class="loading-spinner" id="spinner"></div>
+                        <span id="btnText">Create Account</span>
+                    </div>
+                </button>
+            </form>
+
+            <div class="requirements">
+                <div class="requirements-title">📋 Password Requirements:</div>
+                <div class="requirement-item" id="req-length">✗ At least 6 characters</div>
+                <div class="requirement-item" id="req-match">✗ Passwords match</div>
+                <div class="requirement-item">Admin login is required to create any new account.</div>
+            </div>
+
+            <div class="login-link" style="margin-top: 25px;">
+                Already have an account? <a href="login.html">Sign in here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api';
+
+        function checkPasswordRequirements() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            const reqLength = document.getElementById('req-length');
+            const reqMatch = document.getElementById('req-match');
+
+            if (password.length >= 6) {
+                reqLength.classList.add('met');
+                reqLength.textContent = '✓ At least 6 characters';
+            } else {
+                reqLength.classList.remove('met');
+                reqLength.textContent = '✗ At least 6 characters';
+            }
+
+            if (password && confirmPassword && password === confirmPassword) {
+                reqMatch.classList.add('met');
+                reqMatch.textContent = '✓ Passwords match';
+            } else if (password || confirmPassword) {
+                reqMatch.classList.remove('met');
+                reqMatch.textContent = '✗ Passwords match';
+            }
+        }
+
+        document.getElementById('confirmPassword').addEventListener('input', checkPasswordRequirements);
+
+        async function handleSignup(event) {
+            event.preventDefault();
+
+            const fullname = document.getElementById('fullname').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const department = document.getElementById('department').value;
+            const phone = document.getElementById('phone').value.trim();
+
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            const signupBtn = document.getElementById('signupBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
+
+            // Validation
+const role = document.getElementById('role').value;
+                const adminUsername = document.getElementById('adminUsername').value.trim();
+                const adminPassword = document.getElementById('adminPassword').value;
+
+                if (!fullname || !username || !password || !department || !role || !adminUsername || !adminPassword) {
+                    showError('Please fill in all required fields, including admin credentials.');
+                    return;
+                }
+
+                if (username.length < 3) {
+                    showError('Username must be at least 3 characters');
+                    return;
+                }
+
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showError('Passwords do not match');
+                return;
+            }
+
+            signupBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Creating Account...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        full_name: fullname,
+                        department,
+                        phone,
+                        role,
+                        admin_username: adminUsername,
+                        admin_password: adminPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showSuccess('Account created successfully! Redirecting to login...');
+
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Failed to create account');
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                showError('Connection error. Please try again.');
+            } finally {
+                signupBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Create Account';
+            }
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = '❌ ' + message;
+            errorMessage.classList.add('show');
+        }
+
+        function showSuccess(message) {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.textContent = '✅ ' + message;
+            successMessage.classList.add('show');
+        }
+
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                window.location.href = 'dashboard.html';
+            }
+        });
+
+        document.getElementById('signupForm').addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                handleSignup(event);
+            }
+        });
+    </script>
+</body>
+
+</html>

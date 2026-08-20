@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPE Violations Log</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: #1E1E1E;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #FFC107; font-size: 28px; font-weight: 700; }
+        .header-stats { display: flex; gap: 30px; margin-top: 15px; }
+        .stat-chip {
+            padding: 8px 16px;
+            background: rgba(245, 101, 101, 0.1);
+            border-left: 4px solid #f56565;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fc8181;
+        }
+        .nav-menu {
+            background: #1E1E1E;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: transparent;
+            color: #D1D5DB;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nav-btn:hover { transform: translateY(-2px); background: #333; }
+        .nav-btn.active { background: #FFC107; color: #121212; border-color: #FFC107; font-weight: 700; }
+        .filters-panel {
+            background: #1E1E1E;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; }
+        .filter-label { color: #9CA3AF; font-size: 14px; font-weight: 600; }
+        .filter-input, .filter-select {
+            padding: 12px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #2D2D2D;
+            color: #F3F4F6;
+            transition: all 0.3s ease;
+        }
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #FFC107;
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        }
+        .filter-actions { display: flex; gap: 10px; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #FFC107;
+            color: #121212;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3); background: #F5B301; }
+        .btn-secondary { background: #2D2D2D; color: #D1D5DB; border: 1px solid #444; }
+        .btn-secondary:hover { background: #333; }
+        .violations-table-container {
+            background: #1E1E1E;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .table-header h2 { color: #FFC107; font-size: 20px; font-weight: 700; }
+        .violations-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .violations-table thead {
+            background: #FFC107;
+            color: #121212;
+        }
+        .violations-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .violations-table td {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            color: #D1D5DB;
+            font-size: 14px;
+        }
+        .violations-table tbody tr {
+            background: #1E1E1E;
+            transition: all 0.3s ease;
+        }
+        .violations-table tbody tr:hover {
+            background: #2D2D2D;
+            transform: scale(1.01);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        .violation-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .violation-helmet { background: rgba(245, 101, 101, 0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .violation-vest { background: rgba(237, 137, 54, 0.2); color: #f6ad55; border: 1px solid #f6ad55; }
+        .violation-gloves { background: rgba(236, 201, 75, 0.2); color: #ecc94b; border: 1px solid #ecc94b; }
+        .violation-boots { background: rgba(159, 122, 234, 0.2); color: #b794f4; border: 1px solid #b794f4; }
+        .severity-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .severity-high { background: rgba(245, 101, 101, 0.2); color: #fc8181; border: 1px solid #fc8181; }
+        .severity-medium { background: rgba(237, 137, 54, 0.2); color: #f6ad55; border: 1px solid #f6ad55; }
+        .severity-low { background: rgba(72, 187, 120, 0.2); color: #68d391; border: 1px solid #68d391; }
+        .action-btns { display: flex; gap: 8px; }
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .action-view { background: #2D2D2D; color: #D1D5DB; border: 1px solid #444; }
+        .action-view:hover { background: #333; }
+        .action-resolve { background: rgba(72, 187, 120, 0.2); color: #68d391; border: 1px solid #68d391; }
+        .action-resolve:hover { background: rgba(72, 187, 120, 0.4); }
+        .loading { text-align: center; padding: 20px; color: #9CA3AF; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fa-solid fa-triangle-exclamation"></i> PPE Violations Log</h1>
+            <div class="header-stats">
+                <div class="stat-chip">Today: <span id="todayCount">...</span> Violations</div>
+                <div class="stat-chip">This Week: <span id="weekCount">...</span> Violations</div>
+                <div class="stat-chip">Pending: <span id="pendingCount">...</span></div>
+            </div>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
+            <a href="cctv.html" class="nav-btn">CCTV Feeds</a>
+            <a href="violations.html" class="nav-btn active">Violations</a>
+            <a href="attendance.html" class="nav-btn">Attendance</a>
+            <a href="salary.html" class="nav-btn">Salary & Fines</a>
+            <a href="workers.html" class="nav-btn">Workers</a>
+            <a href="health.html" class="nav-btn">Health Alerts</a>
+            <a href="face-recognition.html" class="nav-btn">Face Recognition</a>
+        </nav>
+
+        <div class="filters-panel">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label class="filter-label">Date From</label>
+                    <input type="date" class="filter-input" id="dateFrom">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Date To</label>
+                    <input type="date" class="filter-input" id="dateTo">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Violation Type</label>
+                    <select class="filter-select" id="violationType">
+                        <option value="">All Types</option>
+                        <option value="helmet">Missing Helmet</option>
+                        <option value="vest">Missing Vest</option>
+                        <option value="gloves">Missing Gloves</option>
+                        <option value="boots">Missing Boots</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Severity</label>
+                    <select class="filter-select" id="severity">
+                        <option value="">All Severities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Worker ID</label>
+                    <input type="text" class="filter-input" id="workerId" placeholder="Search Worker ID">
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-primary" onclick="applyFilters()"><i class="fa-solid fa-magnifying-glass"></i> Apply Filters</button>
+                <button class="btn btn-secondary" onclick="resetFilters()"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
+            </div>
+        </div>
+
+        <div class="violations-table-container">
+            <div class="table-header">
+                <h2>Violation Records</h2>
+            </div>
+
+            <table class="violations-table">
+                <thead>
+                    <tr>
+                        <th>Violation ID</th>
+                        <th>Date & Time</th>
+                        <th>Worker ID</th>
+                        <th>Worker Name</th>
+                        <th>Violation Type</th>
+                        <th>Severity</th>
+                        <th>Camera</th>
+                        <th>Fine Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="violationsTableBody">
+                    <tr><td colspan="9" class="loading">Loading violations data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api';
+
+        // Set default dates
+        function setDefaultDates() {
+            const today = new Date();
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            
+            document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+            document.getElementById('dateFrom').value = weekAgo.toISOString().split('T')[0];
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/violations/stats/summary`);
+                const stats = await response.json();
+                
+                document.getElementById('todayCount').textContent = stats.today || 0;
+                document.getElementById('weekCount').textContent = stats.week || 0;
+                document.getElementById('pendingCount').textContent = stats.pending || 0;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load violations with filters
+        async function loadViolations() {
+            try {
+                const dateFrom = document.getElementById('dateFrom').value;
+                const dateTo = document.getElementById('dateTo').value;
+                const violationType = document.getElementById('violationType').value;
+                const severity = document.getElementById('severity').value;
+                const workerId = document.getElementById('workerId').value;
+
+                let url = `${API_BASE}/violations?`;
+                if (dateFrom && dateTo) url += `date_from=${dateFrom}&date_to=${dateTo}&`;
+                if (violationType) url += `violation_type=${violationType}&`;
+                if (severity) url += `severity=${severity}&`;
+                if (workerId) url += `worker_id=${workerId}&`;
+
+                const response = await fetch(url);
+                const violations = await response.json();
+                
+                const tbody = document.getElementById('violationsTableBody');
+                
+                if (violations.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">No violations found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = violations.map(v => {
+                    const timestamp = new Date(v.timestamp).toLocaleString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric',
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    
+                    return `
+                        <tr>
+                            <td><strong>${v.violation_id}</strong></td>
+                            <td>${timestamp}</td>
+                            <td>${v.worker_id || 'N/A'}</td>
+                            <td>${v.worker_name || 'Unknown'}</td>
+                            <td><span class="violation-badge violation-${v.violation_type}">${v.violation_type.toUpperCase()}</span></td>
+                            <td><span class="severity-badge severity-${v.severity}">${v.severity.toUpperCase()}</span></td>
+                            <td>Camera ${v.camera_id || 'N/A'}</td>
+                            <td>PKR ${v.fine_amount || 0}</td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="action-btn action-resolve" onclick="resolveViolation('${v.violation_id}')">✓ Resolve</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading violations:', error);
+                document.getElementById('violationsTableBody').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">Error loading data</td></tr>';
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            loadViolations();
+        }
+
+        // Reset filters
+        function resetFilters() {
+            setDefaultDates();
+            document.getElementById('violationType').value = '';
+            document.getElementById('severity').value = '';
+            document.getElementById('workerId').value = '';
+            loadViolations();
+        }
+
+        // Resolve violation
+        async function resolveViolation(violationId) {
+            try {
+                const response = await fetch(`${API_BASE}/violations/${violationId}/resolve`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    alert('Violation resolved successfully!');
+                    loadViolations();
+                    loadStats();
+                } else {
+                    alert('Error resolving violation');
+                }
+            } catch (error) {
+                console.error('Error resolving violation:', error);
+                alert('Error resolving violation');
+            }
+        }
+
+        // Initialize
+        setDefaultDates();
+        loadStats();
+        loadViolations();
+
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadStats();
+            loadViolations();
+        }, 30000);
+    </script>
+
+    <script>
+    // ========== ADD THIS TO EVERY PAGE ==========
+    // Authentication check
+    window.addEventListener('load', () => {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token) {
+            // Not logged in, redirect to login
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        // User is logged in, display their name if there's a user display element
+        const userDisplay = document.getElementById('userDisplay');
+        if (userDisplay) {
+            userDisplay.textContent = user.full_name || 'User';
+        }
+    });
+    
+    // Logout function
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    }
+    // ========== END OF AUTH CODE ==========
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>
