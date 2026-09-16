@@ -32,6 +32,6 @@ jobs:
           echo "🚀 Deploying Master AI Server to Hugging Face Spaces..."
           
         
-          huggingface-cli upload wasayrabbani/ppe-system ./Face_recognition / --repo-type space --token $HF_TOKEN
+          hf upload wasayrabbani/ppe-system ./Face_recognition / --repo-type space --token $HF_TOKEN
           
           echo "✅ Deployment Successful!"
