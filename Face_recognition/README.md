@@ -1,6 +1,6 @@
 ---
 title: Construction Safety PPE
-emoji: 🏗️
+emoji: 🚧
 colorFrom: yellow
 colorTo: red
 sdk: docker
@@ -10,4 +10,4 @@ pinned: false
 
 # Construction Safety PPE - AI Server
 
-This is the Master AI Server for the PPE and Face Recognition system.
+Master AI Server for PPE detection and Face Recognition.
