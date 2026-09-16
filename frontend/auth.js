@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:4000/api';
+
 
 const PAGE_ROLE_PERMISSIONS = {
     'dashboard.html': ['admin', 'safety officer', 'hr', 'monitor', 'accounts', 'supervisor', 'worker'],

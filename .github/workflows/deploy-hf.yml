@@ -1,0 +1,38 @@
+name: Deploy AI to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Face_recognition/**'
+      - '.github/workflows/deploy-hf.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install Hugging Face CLI
+        run: pip install huggingface_hub
+        
+      - name: Sync AI to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "🚀 Deploying Master AI Server to Hugging Face Spaces..."
+          
+          # Replace 'your-username' and 'your-space' later!
+          # We upload the INSIDE of the Face_recognition folder to the ROOT of the Hugging Face Space
+          huggingface-cli upload WASAY-RABBANI/my-ppe-space ./Face_recognition / --repo-type space --token $HF_TOKEN
+          
+          echo "✅ Deployment Successful!"

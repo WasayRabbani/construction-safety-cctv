@@ -524,6 +524,7 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
     // ========== ADD THIS TO EVERY PAGE ==========
     // Authentication check
@@ -556,12 +557,12 @@
     </script>
 
     <script>
-        const API_BASE = 'http://localhost:4000/api';
+        
         let allWorkers = [];
 
         async function loadStats() {
             try {
-                const response = await fetch(`${API_BASE}/workers/stats/summary`);
+                const response = await fetch(`${CONFIG.API_BASE}/workers/stats/summary`);
                 const stats = await response.json();
                 
                 document.getElementById('totalWorkers').textContent = stats.total_workers || 0;
@@ -575,7 +576,7 @@
 
         async function loadWorkers() {
             try {
-                const response = await fetch(`${API_BASE}/workers`);
+                const response = await fetch(`${CONFIG.API_BASE}/workers`);
                 allWorkers = await response.json();
                 displayWorkers(allWorkers);
             } catch (error) {
@@ -848,13 +849,13 @@
                 let response;
                 if (isEditMode) {
                     const originalId = document.getElementById('originalWorkerId').value;
-                    response = await fetch(`${API_BASE}/workers/${originalId}`, {
+                    response = await fetch(`${CONFIG.API_BASE}/workers/${originalId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    response = await fetch(`${API_BASE}/workers`, {
+                    response = await fetch(`${CONFIG.API_BASE}/workers`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -883,7 +884,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/workers/${workerId}`, {
+                const response = await fetch(`${CONFIG.API_BASE}/workers/${workerId}`, {
                     method: 'DELETE'
                 });
 

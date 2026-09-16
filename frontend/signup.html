@@ -374,8 +374,9 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        const API_BASE = 'http://localhost:4000/api';
+        
 
         function checkPasswordRequirements() {
             const password = document.getElementById('password').value;
@@ -452,7 +453,7 @@ const role = document.getElementById('role').value;
             btnText.textContent = 'Creating Account...';
 
             try {
-                const response = await fetch(`${API_BASE}/auth/register`, {
+                const response = await fetch(`${CONFIG.API_BASE}/auth/register`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

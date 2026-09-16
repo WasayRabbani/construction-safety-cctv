@@ -1,47 +1,31 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, '../../uploads/workers');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Boilerplate: Authenticate with your .env secrets
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-// Configure storage
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        // Generate unique filename: workerId_timestamp.extension
-        const workerId = req.body.worker_id || 'temp';
-        const extension = path.extname(file.originalname);
-        const filename = `${workerId}_${Date.now()}${extension}`;
-        cb(null, filename);
+// Core Logic: Tell Multer to send files to Cloudinary instead of the hard drive
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'ppe_workers', // The folder name inside your Cloudinary account
+        allowed_formats: ['jpg', 'png', 'jpeg'],
+        public_id: (req, file) => {
+            const workerId = req.body.worker_id || 'temp';
+            return `${workerId}_${Date.now()}`;
+        }
     }
 });
 
-// File filter to accept only images
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-        return cb(null, true);
-    } else {
-        cb(new Error('Only image files (jpeg, jpg, png, gif) are allowed!'));
-    }
-};
-
-// Configure multer
+// Configure Multer
 const upload = multer({
     storage: storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
-    },
-    fileFilter: fileFilter
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
 module.exports = upload;

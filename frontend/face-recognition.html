@@ -241,6 +241,7 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
     // ========== AUTH CHECK ==========
     window.addEventListener('load', () => {
@@ -327,7 +328,7 @@
         getCameras();
 
         // Load face database when page opens
-        fetch('http://127.0.0.1:5000/load-model', { method: 'POST' })
+        fetch(`${CONFIG.AI_FACE_BASE}/load-model`, { method: 'POST' })
             .then(() => console.log('[INFO] Face model loaded.'))
             .catch(() => console.warn('[WARN] Face Recognition API not running.'));
 
@@ -340,10 +341,10 @@
                     video.srcObject = null;
                 }
                 // Unload face database to free memory
-                fetch('http://127.0.0.1:5000/unload-model', { method: 'POST', keepalive: true }).catch(() => {});
+                fetch(`${CONFIG.AI_FACE_BASE}/unload-model`, { method: 'POST', keepalive: true }).catch(() => {});
             } else {
                 // Reload face database
-                fetch('http://127.0.0.1:5000/load-model', { method: 'POST' }).catch(() => {});
+                fetch(`${CONFIG.AI_FACE_BASE}/load-model`, { method: 'POST' }).catch(() => {});
                 if (videoSource.value) {
                     startWebcam(videoSource.value);
                 } else {
@@ -354,7 +355,7 @@
 
         // Unload model when navigating away from this page entirely
         window.addEventListener('beforeunload', () => {
-            fetch('http://127.0.0.1:5000/unload-model', { method: 'POST', keepalive: true }).catch(() => {});
+            fetch(`${CONFIG.AI_FACE_BASE}/unload-model`, { method: 'POST', keepalive: true }).catch(() => {});
         });
 
         // Scan the face and send to backend

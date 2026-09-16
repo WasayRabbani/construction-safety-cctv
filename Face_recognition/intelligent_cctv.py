@@ -181,34 +181,9 @@ def background_ai_worker():
     global KNOWN_ENCODINGS, KNOWN_NAMES
     
     total_images = 0
-    start_time = time.time()
-    print(f"🔄 Initializing Employee Database into Memory...")
-    
-    try:
-        for root, dirs, files in os.walk(EMPLOYEES_DB):
-            for f in files:
-                if f.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    total_images += 1
-                    path = os.path.join(root, f)
-                    worker_id = os.path.basename(root)
-                    try:
-                        if 'face_recognition' in globals():
-                            img = cv2.imread(path)
-                            if img is not None:
-                                rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                                encodings = face_recognition.face_encodings(rgb_img)
-                                if len(encodings) > 0:
-                                    KNOWN_ENCODINGS.append(encodings[0])
-                                    KNOWN_NAMES.append(worker_id)
-                    except:
-                        pass
-        elapsed = time.time() - start_time
-        print(f"✅ SYSTEM READY: PPE Model and Face Database ({total_images} employees) loaded in {elapsed:.2f}s.")
-        print(f"🚀 Monitoring is now active on http://127.0.0.1:{PORT}")
-    except Exception as e:
-        elapsed = time.time() - start_time
-        print(f"[WARN] Database pre-build issue ({elapsed:.1f}s): {e}")
-        print(f"[INFO] Will attempt to build cache on first face scan instead.")
+    db_loaded = False
+    ai_frame_counter = 0
+    AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame (Option C)
 
     ai_frame_counter = 0
     AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame (Option C)
@@ -217,6 +192,33 @@ def background_ai_worker():
         if global_frame is None or not CAMERA_ACTIVE:
             time.sleep(0.1)
             continue
+
+        if not db_loaded:
+            start_time = time.time()
+            print(f"🔄 Initializing Employee Database into Memory...")
+            try:
+                for root, dirs, files in os.walk(EMPLOYEES_DB):
+                    for f in files:
+                        if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                            total_images += 1
+                            path = os.path.join(root, f)
+                            worker_id = os.path.basename(root)
+                            try:
+                                if 'face_recognition' in globals():
+                                    img = cv2.imread(path)
+                                    if img is not None:
+                                        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                                        encodings = face_recognition.face_encodings(rgb_img)
+                                        if len(encodings) > 0:
+                                            KNOWN_ENCODINGS.append(encodings[0])
+                                            KNOWN_NAMES.append(worker_id)
+                            except:
+                                pass
+                elapsed = time.time() - start_time
+                print(f"✅ SYSTEM READY: PPE Model and Face Database ({total_images} employees) loaded in {elapsed:.2f}s.")
+            except Exception as e:
+                print(f"[WARN] Database pre-build issue: {e}")
+            db_loaded = True
 
         # Skip AI processing if model isn't loaded yet
         if yolo_model is None:

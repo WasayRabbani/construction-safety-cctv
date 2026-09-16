@@ -5,12 +5,18 @@ const db = require('../config/database');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key_change_this';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error("CRITICAL ERROR: JWT_SECRET is missing from .env file!");
+    process.exit(1);
+}
 
-const ADMIN_REGISTER_CREDENTIALS = {
-    username: 'maliksaad',
-    password: 'maliksaad123'
-};
+// Master password required to register new users
+const ADMIN_SECRET_PASSWORD = process.env.ADMIN_SECRET_PASSWORD;
+if (!ADMIN_SECRET_PASSWORD) {
+    console.error("CRITICAL ERROR: ADMIN_SECRET_PASSWORD is missing from .env file!");
+    process.exit(1);
+}
 
 const ALLOWED_ROLES = ['admin', 'safety officer', 'hr', 'monitor', 'accounts', 'supervisor', 'worker'];
 
@@ -45,13 +51,10 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        if (
-            admin_username !== ADMIN_REGISTER_CREDENTIALS.username ||
-            admin_password !== ADMIN_REGISTER_CREDENTIALS.password
-        ) {
+        if (admin_password !== ADMIN_SECRET_PASSWORD) {
             return res.status(401).json({
                 success: false,
-                error: 'Invalid admin credentials. New account creation requires administration login.'
+                error: 'Invalid admin credentials. New account creation requires the master administration password.'
             });
         }
 

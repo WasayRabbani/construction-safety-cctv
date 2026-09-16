@@ -279,8 +279,9 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        const API_BASE = 'http://localhost:4000/api';
+        
 
         // Set default dates
         function setDefaultDates() {
@@ -295,7 +296,7 @@
         // Load statistics
         async function loadStats() {
             try {
-                const response = await fetch(`${API_BASE}/violations/stats/summary`);
+                const response = await fetch(`${CONFIG.API_BASE}/violations/stats/summary`);
                 const stats = await response.json();
                 
                 document.getElementById('todayCount').textContent = stats.today || 0;
@@ -315,7 +316,7 @@
                 const severity = document.getElementById('severity').value;
                 const workerId = document.getElementById('workerId').value;
 
-                let url = `${API_BASE}/violations?`;
+                let url = `${CONFIG.API_BASE}/violations?`;
                 if (dateFrom && dateTo) url += `date_from=${dateFrom}&date_to=${dateTo}&`;
                 if (violationType) url += `violation_type=${violationType}&`;
                 if (severity) url += `severity=${severity}&`;
@@ -381,7 +382,7 @@
         // Resolve violation
         async function resolveViolation(violationId) {
             try {
-                const response = await fetch(`${API_BASE}/violations/${violationId}/resolve`, {
+                const response = await fetch(`${CONFIG.API_BASE}/violations/${violationId}/resolve`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' }
                 });

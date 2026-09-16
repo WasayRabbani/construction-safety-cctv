@@ -8,6 +8,7 @@ pandas
 imageio-ffmpeg
 setuptools<70.0.0
 numpy<2
+cloudinary
 
 # --- FAST FACIAL RECOGNITION ---
 # Note: For Windows, it is highly recommended to install the pre-compiled dlib wheel

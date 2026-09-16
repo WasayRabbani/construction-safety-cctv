@@ -1,6 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,8 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #121212;
@@ -80,8 +84,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         .main-content {
@@ -118,7 +129,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.6) 100%);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 20%, transparent 80%, rgba(0, 0, 0, 0.6) 100%);
             pointer-events: none;
             z-index: 1;
         }
@@ -263,6 +274,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="header-left">
@@ -272,7 +284,8 @@
             <div class="camera-title">Camera 1 - Main Entrance</div>
         </div>
         <div style="display: flex; align-items: center; gap: 15px;">
-            <select id="cameraSelect" style="padding: 8px 14px; background: rgba(30,41,59,0.8); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+            <select id="cameraSelect"
+                style="padding: 8px 14px; background: rgba(30,41,59,0.8); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                 <option value="0">Laptop Webcam</option>
                 <option value="imou">Imou CCTV Camera</option>
             </select>
@@ -291,17 +304,20 @@
                     AI OVERLAY ACTIVE
                 </div>
                 <div class="timestamp" id="timestamp" style="z-index: 10;">00:00:00</div>
-                
+
                 <!-- MJPEG Native Stream injected directly from Python -->
-                <img id="videoPlayer" src="http://127.0.0.1:5001/video_feed" style="width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0;" onerror="handleStreamError()" />
-                
+                <img id="videoPlayer" src=""
+                    style="width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0;"
+                    onerror="handleStreamError()" />
+
                 <div class="feed-placeholder" id="loadingPlaceholder">
                     <div class="icon"><i class="fa-solid fa-robot"></i></div>
                     <div id="statusText" style="color: #FFC107; font-weight:bold;">Initializing Dual AI Stream...</div>
-                    <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Please ensure `intelligent_cctv.py` is running</div>
+                    <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Please ensure `intelligent_cctv.py`
+                        is running</div>
                 </div>
             </div>
-            
+
             <div class="camera-info-bar">
                 <div class="info-item">
                     <div class="info-label">Location</div>
@@ -325,29 +341,30 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-    // ========== AUTH CHECK ==========
-    window.addEventListener('load', () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = 'login.html';
-            return;
+        // ========== AUTH CHECK ==========
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+        });
+        function handleLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+            }
         }
-    });
-    function handleLogout() {
-        if (confirm('Are you sure you want to logout?')) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = 'login.html';
-        }
-    }
-    // ========== END AUTH ==========
+        // ========== END AUTH ==========
     </script>
 
     <script>
         function updateTimestamp() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { 
+            const timeString = now.toLocaleTimeString('en-US', {
                 hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
@@ -363,19 +380,19 @@
         const placeholder = document.getElementById('loadingPlaceholder');
         const statusBadge = document.getElementById('statusBadge');
         const cameraSelect = document.getElementById('cameraSelect');
-        
+
         // Load current camera setting from Python backend
         fetch('http://127.0.0.1:5001/get_camera')
             .then(r => r.json())
             .then(data => { cameraSelect.value = data.camera; })
-            .catch(() => {});
+            .catch(() => { });
 
         // Camera switch handler
         cameraSelect.addEventListener('change', async () => {
             const source = cameraSelect.value;
             statusBadge.className = 'status-badge';
             statusBadge.innerHTML = '<span class="recording-dot"></span> SWITCHING...';
-            
+
             try {
                 await fetch('http://127.0.0.1:5001/set_camera', {
                     method: 'POST',
@@ -384,13 +401,13 @@
                 });
                 // Reload the MJPEG stream with a cache-busting param
                 img.src = 'http://127.0.0.1:5001/video_feed?' + new Date().getTime();
-            } catch(e) {
+            } catch (e) {
                 console.error('Camera switch failed:', e);
             }
         });
 
         // Hide placeholder once stream successfully loads a frame
-        img.onload = function() {
+        img.onload = function () {
             placeholder.classList.add('hidden');
             statusBadge.className = 'status-badge live';
             statusBadge.innerHTML = '<span class="recording-dot"></span> LIVE AI FEED';
@@ -403,7 +420,7 @@
             document.getElementById('statusText').style.color = '#ef4444';
             statusBadge.className = 'status-badge';
             statusBadge.innerHTML = '<span class="recording-dot" style="background:#ef4444;"></span> OFFLINE';
-            
+
             // Try to reconnect every 3 seconds
             setTimeout(() => {
                 img.style.display = 'block';
@@ -413,9 +430,9 @@
         // --- Tab Visibility & Camera Cleanup Logic ---
         function notifyCameraState(active) {
             if (active) {
-                fetch('http://127.0.0.1:5001/start_camera', {method: 'POST'}).catch(()=>{});
+                fetch('http://127.0.0.1:5001/start_camera', { method: 'POST' }).catch(() => { });
             } else {
-                fetch('http://127.0.0.1:5001/stop_camera', {method: 'POST', keepalive: true}).catch(()=>{});
+                fetch('http://127.0.0.1:5001/stop_camera', { method: 'POST', keepalive: true }).catch(() => { });
             }
         }
 
@@ -438,4 +455,5 @@
     </script>
     <script src="auth.js"></script>
 </body>
+
 </html>

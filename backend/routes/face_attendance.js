@@ -13,7 +13,8 @@ router.post('/scan', async (req, res) => {
 
         // Using native Node 18+ fetch API instead of node-fetch
         // Ensure Python API is running on port 5000
-        const pythonResponse = await fetch('http://127.0.0.1:5000/recognize', {
+        const faceApiUrl = process.env.AI_FACE_API_URL || 'http://127.0.0.1:7860/face';
+        const pythonResponse = await fetch(`${faceApiUrl}/recognize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image: image })

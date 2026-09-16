@@ -354,6 +354,7 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
         // Authentication check
         window.addEventListener('load', () => {
@@ -373,11 +374,11 @@
             }
         }
 
-        const API_BASE = 'http://localhost:4000/api';
+        
 
         async function loadWorkerStats() {
             try {
-                const response = await fetch(`${API_BASE}/workers/stats/summary`);
+                const response = await fetch(`${CONFIG.API_BASE}/workers/stats/summary`);
                 const stats = await response.json();
                 document.getElementById('totalWorkers').textContent = stats.total_workers || 0;
             } catch (error) {
@@ -388,7 +389,7 @@
 
         async function loadAttendanceStats() {
             try {
-                const response = await fetch(`${API_BASE}/attendance/stats/today`);
+                const response = await fetch(`${CONFIG.API_BASE}/attendance/stats/today`);
                 const stats = await response.json();
                 document.getElementById('presentToday').textContent = stats.present_count || 0;
             } catch (error) {
@@ -398,7 +399,7 @@
 
         async function loadViolationStats() {
             try {
-                const response = await fetch(`${API_BASE}/violations/stats/summary`);
+                const response = await fetch(`${CONFIG.API_BASE}/violations/stats/summary`);
                 const stats = await response.json();
                 document.getElementById('ppeViolations').textContent = stats.today || 0;
             } catch (error) {
@@ -409,7 +410,7 @@
 
         async function loadHealthStats() {
             try {
-                const response = await fetch(`${API_BASE}/health/stats/summary`);
+                const response = await fetch(`${CONFIG.API_BASE}/health/stats/summary`);
                 const stats = await response.json();
                 document.getElementById('healthAlerts').textContent = stats.critical || 0;
             } catch (error) {
@@ -421,7 +422,7 @@
         async function loadRecentViolations() {
             try {
                 const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`${API_BASE}/violations?date_from=${today}&date_to=${today}`);
+                const response = await fetch(`${CONFIG.API_BASE}/violations?date_from=${today}&date_to=${today}`);
                 const violations = await response.json();
                 const violationsList = document.getElementById('violationsList');
                 
@@ -449,7 +450,7 @@
         async function loadTodayAttendance() {
             try {
                 const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`${API_BASE}/attendance/date/${today}`);
+                const response = await fetch(`${CONFIG.API_BASE}/attendance/date/${today}`);
                 const attendance = await response.json();
                 const tbody = document.getElementById('workersTableBody');
                 
@@ -482,7 +483,7 @@
         async function loadRecentActivity() {
             try {
                 const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`${API_BASE}/attendance/date/${today}`);
+                const response = await fetch(`${CONFIG.API_BASE}/attendance/date/${today}`);
                 const attendance = await response.json();
                 const activityList = document.getElementById('activityList');
                 const recentAttendance = attendance.slice(0, 5);
