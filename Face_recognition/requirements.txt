@@ -13,7 +13,7 @@ cloudinary
 # --- FAST FACIAL RECOGNITION ---
 # Note: For Windows, it is highly recommended to install the pre-compiled dlib wheel
 # before running `pip install -r requirements.txt` to avoid Visual Studio C++ compiler errors.
-dlib
+# dlib is installed via apt-get in Dockerfile to prevent OOM errors
 face_recognition
 
 # --- GPU ACCELERATION (OPTIONAL) ---
