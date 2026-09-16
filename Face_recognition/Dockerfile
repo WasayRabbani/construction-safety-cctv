@@ -4,9 +4,9 @@ FROM python:3.10-slim
 # 2. Set up the working directory inside the container
 WORKDIR /app
 
-# 3. Install necessary system packages for OpenCV (libgl1, libglib2.0)
+# 3. Install necessary system packages for OpenCV and dlib
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     ffmpeg \
     cmake \
@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 4. Copy the requirements file into the container and install Python dependencies
+# Using CMAKE_BUILD_PARALLEL_LEVEL=1 prevents OOM (Out Of Memory) when compiling dlib
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN CMAKE_BUILD_PARALLEL_LEVEL=1 pip install --no-cache-dir -r requirements.txt
 
 # 5. Copy all the rest of the AI files into the container
 COPY . .
