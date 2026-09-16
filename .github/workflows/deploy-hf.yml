@@ -31,8 +31,7 @@ jobs:
         run: |
           echo "🚀 Deploying Master AI Server to Hugging Face Spaces..."
           
-          # Replace 'your-username' and 'your-space' later!
-          # We upload the INSIDE of the Face_recognition folder to the ROOT of the Hugging Face Space
-          huggingface-cli upload WASAY-RABBANI/my-ppe-space ./Face_recognition / --repo-type space --token $HF_TOKEN
+        
+          huggingface-cli upload wasayrabbani/ppe-system ./Face_recognition / --repo-type space --token $HF_TOKEN
           
           echo "✅ Deployment Successful!"
