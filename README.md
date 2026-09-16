@@ -1,75 +1,97 @@
-# Intelligent Construction Safety & CCTV Monitoring System
+# 🏗️ Construction Site Safety Management System
 
-![Project Banner](https://img.shields.io/badge/AI-Powered%20Monitoring-blue?style=for-the-badge) ![YOLOv8](https://img.shields.io/badge/YOLOv8-PPE%20Detection-orange?style=for-the-badge) ![dlib](https://img.shields.io/badge/dlib-Face%20Recognition-success?style=for-the-badge)
+An advanced, AI-powered computer vision platform designed to ensure safety and compliance on construction sites. This system integrates **Real-Time CCTV Streaming**, **Offline Video Analysis**, **PPE (Personal Protective Equipment) Detection**, and **Facial Recognition** into a unified dashboard for administrators, supervisors, and workers.
 
-A state-of-the-art AI monitoring system designed for construction sites. It uses ultra-fast AI inference to monitor live CCTV feeds for Personal Protective Equipment (PPE) compliance and authenticates construction workers on-site using high-speed Facial Recognition.
+---
 
-## 🚀 Key Features
+## ✨ Key Features
+- **🚨 Real-Time PPE Detection**: Uses a custom-trained **YOLOv8** model to scan live RTSP CCTV feeds for Hardhats, Safety Vests, Masks, Goggles, and Gloves. It also detects critical dangers like workers falling.
+- **👤 Worker Face Recognition**: Scans the CCTV feeds and uploaded videos to automatically identify employees using `dlib/face_recognition`, attaching their names directly to their bounding boxes.
+- **🎥 Offline Video Analysis**: Allows supervisors to upload recorded drone or handheld footage. The Python microservice processes the video frame-by-frame (with heavy CPU optimizations) and returns a fully annotated `.mp4` video with compliance statistics.
+- **👥 Multi-Role Dashboard**: A Node.js backend providing secure access for Admins, Supervisors, and Workers.
+- **💰 Automated Salary & Fines**: Tracks safety compliance across the site and automatically calculates penalties for workers found without proper gear.
 
-*   **Lightning-Fast Facial Recognition**: Upgraded from deep-learning backend to a highly optimized `dlib` C++ HOG architecture for instantaneous sub-30ms face identification in pure RAM.
-*   **Real-time AI CCTV Feed**: High-performance, multi-threaded MJPEG streaming running YOLOv8 object detection without artificial framerate caps.
-*   **Dynamic Resource Management**: AI camera feeds automatically suspend processing and release hardware resources the moment you switch browser tabs, ensuring 0% idle CPU usage.
-*   **Full Worker Dashboard**: Comprehensive Node.js/Express backend with a beautiful frontend to manage employee details, attendance, and safety metrics.
+---
 
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
+- **Frontend**: HTML5, Vanilla CSS (Glassmorphism design), JavaScript.
+- **Backend**: Node.js, Express.js.
+- **Database**: MySQL.
+- **Computer Vision (AI)**: Python, PyTorch, OpenCV, Ultralytics YOLOv8, Face_Recognition.
+- **Media Processing**: FFmpeg (via `imageio-ffmpeg`).
 
-*   **Frontend**: HTML, CSS (Modern Glassmorphism UI), Vanilla JavaScript
-*   **Backend Server**: Node.js, Express, MySQL (Database)
-*   **AI Engine**: Python 3.10, Flask (Microservices)
-*   **Computer Vision**: OpenCV, Ultralytics YOLOv8, `face_recognition`, `dlib`
+---
 
-## ⚙️ Installation & Setup
+## 🚀 Setup Instructions (A to Z)
 
-### 1. Database Setup
-1. Ensure you have **MySQL** or **XAMPP** running.
-2. Create a database named `construction_safety`.
-3. Import the provided `construction_safety.sql` file to populate the tables.
+If you are setting this project up on a new PC, follow these exact steps:
 
-### 2. Node.js Backend Setup
-Open a terminal in the root directory and install the Node dependencies:
-```bash
-npm install
-npm run dev
-```
-*The web dashboard will start on `http://localhost:4000`.*
+### 1. Prerequisites
+You must have the following installed on your machine:
+- [Node.js](https://nodejs.org/) (v16+)
+- [Python](https://www.python.org/downloads/) (v3.9 - v3.11)
+- [MySQL Server](https://dev.mysql.com/downloads/mysql/) (v8+)
 
-### 3. Python AI Engine Setup
-It is highly recommended to use a virtual environment (`.venv`) for the AI module.
-```bash
-cd Face_recognition
-python -m venv .venv
-.\.venv\Scripts\activate
-```
+### 2. Database Setup
+1. Open your MySQL client (e.g., MySQL Workbench).
+2. Create a new database named `construction_safety`.
+3. Import the provided `construction_safety.sql` file into the database to set up all tables and default users.
 
-**⚠️ Important Windows Note for `dlib`:**
-To avoid complex Visual Studio C++ Compiler errors when installing the facial recognition libraries on Windows, please install the pre-compiled `dlib` wheel and downgrade `numpy` BEFORE installing `requirements.txt`:
-```bash
-# Force downgrade numpy to 1.x to maintain C++ ABI compatibility with dlib
-pip install numpy==1.26.4
+### 3. Node.js Backend Setup
+1. Open a terminal in the project root directory.
+2. Install the Node modules:
+   ```bash
+   npm install
+   ```
+3. Create a `.env` file in the root directory and add your database credentials:
+   ```env
+   DB_HOST=localhost
+   DB_USER=root
+   DB_PASSWORD=your_mysql_password
+   DB_NAME=construction_safety
+   API_PORT=4000
+   ```
 
-# Download and install the precompiled dlib wheel for Python 3.10
-Invoke-WebRequest -Uri "https://github.com/Murtaza-Saeed/Dlib-Precompiled-Wheels-for-Python-on-Windows-x64-Easy-Installation/raw/main/dlib-19.22.99-cp310-cp310-win_amd64.whl" -OutFile "dlib.whl"
-pip install dlib.whl
+### 4. Python AI Setup
+1. Open a terminal in the `Face_recognition` folder.
+2. Create a Python virtual environment:
+   ```bash
+   python -m venv .venv
+   ```
+3. Activate the virtual environment:
+   - **Windows**: `.venv\Scripts\activate`
+   - **Mac/Linux**: `source .venv/bin/activate`
+4. Install the required AI libraries:
+   ```bash
+   pip install -r requirements.txt
+   ```
+   *(Note: Installing `dlib` and `face_recognition` may require CMake and Visual Studio C++ Build Tools on Windows).*
 
-# Install the remaining requirements
-pip install -r requirements.txt
-```
+### 5. Setting up the Employee Face Database
+To allow the AI to recognize your workers, you must add their photos to the database:
+1. Go to `Face_recognition/employees/`.
+2. Create a new folder named exactly after the worker (e.g., `John Doe`).
+3. Place a clear `.jpg` or `.png` photo of their face inside that folder.
 
-## 🖥️ Running the Application
+### 6. Running the Project
+For Windows users, simply double-click the `start-streaming.bat` file in the root folder. It will automatically spin up the Node.js server, the CCTV streamer, and the Video Processing microservice.
 
-Once everything is installed, you need to run three separate services to power the full architecture:
+**To run it manually in separate terminals:**
+- **Terminal 1 (Node.js):** `npm run dev`
+- **Terminal 2 (CCTV API):** `Face_recognition\.venv\Scripts\python.exe Face_recognition\intelligent_cctv.py`
+- **Terminal 3 (Video API):** `Face_recognition\.venv\Scripts\python.exe Face_recognition\video_processor.py`
 
-1.  **Node Dashboard**: Run `npm run dev` in the root folder.
-2.  **Face Recognition API**: Inside the `Face_recognition` folder with your `.venv` active, run `python app.py`. This boots the fast Auth API on port 5000.
-3.  **CCTV AI Server**: Inside the `Face_recognition` folder with your `.venv` active, run `python intelligent_cctv.py`. This starts the YOLOv8 and Face Tracking feed on port 5001.
+---
 
-## 📂 Project Architecture
-*   `/backend` - Node.js routes and server configurations.
-*   `/frontend` - HTML/JS dashboards (login, employee management, CCTV).
-*   `/Face_recognition` - Python microservices and neural network models (`best.pt`).
-*   `/uploads` - Database storage for employee photos.
+## 🔑 Demo Credentials
+Once the server is running at `http://localhost:4000`, you can log in using the default credentials:
 
-## 👤 Default Demo Credentials
-*   **Admin**: `admin` / `admin123`
-*   **Supervisor**: `supervisor` / `super123`
-*   **Worker**: `worker1` / `worker123`
+| Role | Username | Password |
+| :--- | :--- | :--- |
+| **Admin** | admin | admin123 |
+| **Supervisor** | supervisor | super123 |
+| **Worker** | worker1 | worker123 |
+
+---
+
+*Built for advanced AI-driven construction safety.*

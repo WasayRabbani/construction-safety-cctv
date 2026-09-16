@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Analysis - Intelligent Safety</title>
+    <meta name="description" content="Upload construction site footage for offline AI-powered PPE compliance detection using YOLOv8.">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #0d0d0d;
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* Subtle animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 80%, rgba(255,193,7,0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(255,120,0,0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+
+        /* ── HEADER ── */
+        .header {
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 22px 30px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            color: #FFC107;
+            font-size: 26px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.3px;
+        }
+        .engine-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #9CA3AF;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #6B7280;
+            transition: background 0.4s;
+        }
+        .status-dot.online { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6); animation: breathe 2s infinite; }
+        .status-dot.offline { background: #ef4444; }
+        @keyframes breathe { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+
+        /* ── NAV ── */
+        .nav-menu {
+            background: rgba(20,20,20,0.6);
+            backdrop-filter: blur(12px);
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 28px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 10px 20px;
+            background: transparent;
+            color: #9CA3AF;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .nav-btn:hover { color: #F3F4F6; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); transform: translateY(-1px); }
+        .nav-btn.active { background: #FFC107; color: #0d0d0d; border-color: #FFC107; font-weight: 700; box-shadow: 0 0 20px rgba(255,193,7,0.35); }
+
+        /* ── MAIN GRID ── */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        @media(max-width: 1024px) { .analysis-grid { grid-template-columns: 1fr; } }
+
+        /* ── CARD ── */
+        .card {
+            background: rgba(18,18,18,0.7);
+            backdrop-filter: blur(14px);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-accent {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #FFC107, #FF9800, #FFC107);
+            background-size: 200%;
+            animation: shimmer 3s linear infinite;
+        }
+        @keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #E5E7EB;
+            margin-bottom: 20px;
+            margin-top: 4px;
+            letter-spacing: -0.2px;
+        }
+
+        /* ── UPLOAD ZONE ── */
+        .upload-zone {
+            border: 2px dashed rgba(255,193,7,0.3);
+            border-radius: 12px;
+            padding: 36px 20px;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+            cursor: pointer;
+            background: rgba(0,0,0,0.15);
+            margin-bottom: 18px;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #FFC107;
+            background: rgba(255,193,7,0.06);
+            transform: scale(1.015);
+            box-shadow: 0 0 30px rgba(255,193,7,0.12);
+        }
+        .upload-icon {
+            font-size: 44px;
+            color: #FFC107;
+            margin-bottom: 14px;
+            filter: drop-shadow(0 0 12px rgba(255,193,7,0.4));
+            transition: transform 0.3s ease;
+        }
+        .upload-zone:hover .upload-icon { transform: translateY(-4px); }
+        .upload-text { font-size: 15px; font-weight: 700; color: #E5E7EB; margin-bottom: 6px; }
+        .upload-sub  { font-size: 12px; color: #6B7280; margin-top: 10px; }
+        input[type="file"] { display: none; }
+
+        /* ── FILE INFO BAR ── */
+        .file-bar {
+            display: none;
+            background: rgba(0,0,0,0.25);
+            padding: 11px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            gap: 10px;
+        }
+        .file-bar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .file-name { font-size: 13px; font-weight: 600; color: #F3F4F6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+        .file-size { font-size: 11px; color: #6B7280; flex-shrink: 0; }
+        .clear-btn { color: #ef4444; cursor: pointer; padding: 4px; flex-shrink: 0; transition: transform 0.2s; }
+        .clear-btn:hover { transform: scale(1.2); }
+
+        /* ── PROCESS BUTTON ── */
+        .btn-process {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #FFC107, #F59E0B);
+            color: #0d0d0d;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(255,193,7,0.35);
+            opacity: 0.45;
+            pointer-events: none;
+            letter-spacing: 0.2px;
+        }
+        .btn-process.ready { opacity: 1; pointer-events: auto; }
+        .btn-process.ready:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(255,193,7,0.5); filter: brightness(1.05); }
+
+        /* ── PROGRESS BAR ── */
+        .progress-wrap { display: none; margin-top: 16px; }
+        .progress-label { font-size: 12px; color: #9CA3AF; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .progress-track {
+            height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #FFC107, #FF9800);
+            border-radius: 99px;
+            transition: width 0.4s ease;
+            box-shadow: 0 0 10px rgba(255,193,7,0.5);
+        }
+
+        /* ── PLAYER AREA ── */
+        .player-wrap {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        .player-placeholder {
+            text-align: center;
+            color: #4B5563;
+            padding: 20px;
+        }
+        .player-placeholder i { font-size: 56px; margin-bottom: 14px; display: block; }
+        .player-placeholder h3 { font-size: 16px; font-weight: 700; color: #6B7280; }
+        .player-placeholder p  { font-size: 13px; margin-top: 6px; }
+        video#resultVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+
+        /* Scanning animation while processing */
+        .scanner-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.88);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            z-index: 5;
+        }
+        .scanner-ring {
+            width: 72px; height: 72px;
+            border: 3px solid rgba(255,193,7,0.15);
+            border-top-color: #FFC107;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .scanner-text { font-size: 15px; font-weight: 700; color: #FFC107; letter-spacing: 1px; }
+        .scanner-sub  { font-size: 12px; color: #9CA3AF; }
+
+        /* ── STATS ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-top: 18px;
+            opacity: 0.35;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        .stats-row.active { opacity: 1; pointer-events: auto; }
+        @media(max-width:768px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+        .stat-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.07);
+            padding: 14px 16px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+        .stat-box:hover { background: rgba(255,193,7,0.04); border-color: rgba(255,193,7,0.2); transform: translateY(-2px); }
+        .stat-ico {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .ico-yellow { background: rgba(255,193,7,0.12); color: #FFC107; }
+        .ico-red    { background: rgba(239,68,68,0.12);  color: #ef4444; }
+        .ico-green  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+        .ico-blue   { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .stat-info span { display: block; }
+        .stat-lbl  { font-size: 11px; color: #6B7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .stat-val  { font-size: 22px; font-weight: 800; color: #F3F4F6; }
+
+        /* ── DOWNLOAD BUTTON ── */
+        .btn-download {
+            display: none;
+            width: 100%;
+            margin-top: 16px;
+            padding: 13px;
+            border: 1px solid rgba(34,197,94,0.4);
+            border-radius: 10px;
+            background: rgba(34,197,94,0.1);
+            color: #22c55e;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .btn-download:hover { background: rgba(34,197,94,0.2); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(34,197,94,0.2); }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1><i class="fa-solid fa-file-video"></i> Offline Video Analysis</h1>
+        <div class="engine-status" id="engineStatus">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusLabel">Checking AI Engine…</span>
+        </div>
+    </div>
+
+    <!-- NAV -->
+    <nav class="nav-menu">
+        <a href="dashboard.html"        class="nav-btn"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+        <a href="cctv.html"             class="nav-btn"><i class="fa-solid fa-video"></i> CCTV Feeds</a>
+        <a href="violations.html"       class="nav-btn"><i class="fa-solid fa-triangle-exclamation"></i> Violations</a>
+        <a href="attendance.html"       class="nav-btn"><i class="fa-solid fa-clipboard-check"></i> Attendance</a>
+        <a href="salary.html"           class="nav-btn"><i class="fa-solid fa-money-bill"></i> Salary &amp; Fines</a>
+        <a href="workers.html"          class="nav-btn"><i class="fa-solid fa-hard-hat"></i> Workers</a>
+        <a href="health.html"           class="nav-btn"><i class="fa-solid fa-truck-medical"></i> Health Alerts</a>
+        <a href="face-recognition.html" class="nav-btn"><i class="fa-solid fa-camera"></i> Face Recognition</a>
+        <a href="video-analysis.html"   class="nav-btn active"><i class="fa-solid fa-upload"></i> Video Analysis</a>
+    </nav>
+
+    <!-- CONTENT -->
+    <div class="analysis-grid">
+
+        <!-- LEFT: Upload Panel -->
+        <div class="card">
+            <div class="card-accent"></div>
+            <div class="card-title"><i class="fa-solid fa-cloud-arrow-up" style="color:#FFC107;margin-right:8px;"></i>Upload Footage</div>
+
+            <input type="file" id="videoInput" accept="video/mp4,video/x-m4v,video/avi,video/mov,video/mkv,video/*">
+
+            <div class="upload-zone" id="dropZone">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <div class="upload-text">Drag &amp; Drop Video Here</div>
+                <div style="font-size:13px;color:#9CA3AF;margin-top:5px;">or click to browse from device</div>
+                <div class="upload-sub">MP4 · AVI · MOV · MKV · WMV &nbsp;|&nbsp; Under 1 minute recommended</div>
+            </div>
+
+            <div class="file-bar" id="fileBar">
+                <div class="file-bar-left">
+                    <i class="fa-solid fa-film" style="color:#FFC107;flex-shrink:0;"></i>
+                    <span class="file-name" id="fileName">video.mp4</span>
+                </div>
+                <span class="file-size" id="fileSize"></span>
+                <span class="clear-btn" onclick="clearFile()" title="Remove file"><i class="fa-solid fa-xmark"></i></span>
+            </div>
+
+            <button class="btn-process" id="processBtn" onclick="startProcessing()">
+                <i class="fa-solid fa-microchip"></i> Analyze with YOLOv8
+            </button>
+
+            <div class="progress-wrap" id="progressWrap">
+                <div class="progress-label">
+                    <span id="progressStage">Processing…</span>
+                    <span id="progressPct">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <!-- Info box -->
+            <div style="margin-top:20px;padding:14px;background:rgba(255,193,7,0.05);border:1px solid rgba(255,193,7,0.12);border-radius:10px;font-size:12px;color:#9CA3AF;line-height:1.7;">
+                <div style="color:#FFC107;font-weight:700;margin-bottom:6px;"><i class="fa-solid fa-circle-info"></i> How it works</div>
+                <div>1. Upload a construction site video.</div>
+                <div>2. YOLOv8 scans every frame for PPE compliance.</div>
+                <div>3. An annotated video is returned with bounding boxes.</div>
+                <div>4. Download the result for your records.</div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Player + Stats -->
+        <div class="card" style="padding:20px;">
+            <div class="card-accent"></div>
+
+            <div class="player-wrap" id="playerWrap">
+                <!-- Scanning overlay -->
+                <div class="scanner-overlay" id="scannerOverlay">
+                    <div class="scanner-ring"></div>
+                    <div class="scanner-text" id="scannerLabel">AI INFERENCING…</div>
+                    <div class="scanner-sub">Running YOLOv8 on every frame</div>
+                </div>
+
+                <!-- Placeholder -->
+                <div class="player-placeholder" id="playerPlaceholder">
+                    <i class="fa-solid fa-photo-film"></i>
+                    <h3>Awaiting Video</h3>
+                    <p>Upload footage and click Analyze to begin.</p>
+                </div>
+
+                <!-- Result video -->
+                <video id="resultVideo" controls></video>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-row" id="statsRow">
+                <div class="stat-box">
+                    <div class="stat-ico ico-green"><i class="fa-solid fa-hard-hat"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-lbl">PPE OK</span>
+                        <span class="stat-val" id="safeCount">--</span>
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-ico ico-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-lbl">Violations</span>
+                        <span class="stat-val" id="violCount">--</span>
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-ico ico-blue"><i class="fa-solid fa-clock"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-lbl">Process Time</span>
+                        <span class="stat-val" id="procTime">--</span>
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-ico ico-yellow"><i class="fa-solid fa-percent"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-lbl">Compliance</span>
+                        <span class="stat-val" id="compliance">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download button -->
+            <a href="#" id="downloadBtn" class="btn-download" download>
+                <i class="fa-solid fa-download"></i> Download Annotated Video
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<!-- AUTH GUARD -->
+<script>
+window.addEventListener('load', () => {
+    if (!localStorage.getItem('token')) window.location.href = 'login.html';
+});
+</script>
+<script src="auth.js"></script>
+
+<!-- APP LOGIC -->
+<script>
+const VIDEO_API_BASE   = 'http://127.0.0.1:5002';
+const POLL_MS    = 1500; // poll status every 1.5 seconds
+
+const dropZone       = document.getElementById('dropZone');
+const videoInput     = document.getElementById('videoInput');
+const fileBar        = document.getElementById('fileBar');
+const fileName       = document.getElementById('fileName');
+const fileSize       = document.getElementById('fileSize');
+const processBtn     = document.getElementById('processBtn');
+const progressWrap   = document.getElementById('progressWrap');
+const progressBar    = document.getElementById('progressBar');
+const progressPct    = document.getElementById('progressPct');
+const progressStage  = document.getElementById('progressStage');
+const scannerOverlay = document.getElementById('scannerOverlay');
+const scannerLabel   = document.getElementById('scannerLabel');
+const playerPlaceholder = document.getElementById('playerPlaceholder');
+const resultVideo    = document.getElementById('resultVideo');
+const statsRow       = document.getElementById('statsRow');
+const downloadBtn    = document.getElementById('downloadBtn');
+
+let selectedFile  = null;
+let pollInterval  = null;
+
+// ── Engine health check ──────────────────────────────────
+async function checkEngine() {
+    try {
+        const r = await fetch(`${VIDEO_API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+            document.getElementById('statusDot').className = 'status-dot online';
+            document.getElementById('statusLabel').textContent = 'AI Engine Online';
+        } else { throw new Error(); }
+    } catch {
+        document.getElementById('statusDot').className = 'status-dot offline';
+        document.getElementById('statusLabel').textContent = 'AI Engine Offline';
+    }
+}
+checkEngine();
+setInterval(checkEngine, 15000);
+
+// ── Upload Zone ──────────────────────────────────────────
+dropZone.addEventListener('click', () => videoInput.click());
+videoInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+    if (!file.type.startsWith('video/')) return alert('Please upload a valid video file.');
+    selectedFile = file;
+
+    fileName.textContent = file.name;
+    fileSize.textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
+    dropZone.style.display = 'none';
+    fileBar.style.display  = 'flex';
+    processBtn.classList.add('ready');
+
+    // Reset result area
+    resetResultArea();
+}
+
+function clearFile() {
+    selectedFile = null;
+    videoInput.value = '';
+    dropZone.style.display = 'block';
+    fileBar.style.display  = 'none';
+    processBtn.classList.remove('ready');
+    processBtn.innerHTML = '<i class="fa-solid fa-microchip"></i> Analyze with YOLOv8';
+    resetResultArea();
+}
+
+function resetResultArea() {
+    resultVideo.style.display = 'none';
+    resultVideo.src = '';
+    playerPlaceholder.style.display = 'block';
+    statsRow.classList.remove('active');
+    downloadBtn.style.display = 'none';
+    progressWrap.style.display = 'none';
+    scannerOverlay.style.display = 'none';
+    setProgress(0, 'Waiting…');
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+function setProgress(pct, stage) {
+    progressBar.style.width = pct + '%';
+    progressPct.textContent  = pct + '%';
+    progressStage.textContent = stage;
+}
+
+// ── Start Processing ─────────────────────────────────────
+async function startProcessing() {
+    if (!selectedFile) return;
+
+    // UI: processing state
+    processBtn.classList.remove('ready');
+    processBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading…';
+    progressWrap.style.display = 'block';
+    scannerOverlay.style.display = 'flex';
+    scannerLabel.textContent = 'UPLOADING VIDEO…';
+    setProgress(0, 'Uploading…');
+    playerPlaceholder.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('video', selectedFile);
+
+    try {
+        const res  = await fetch(`${VIDEO_API_BASE}/api/process-video`, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok || data.status === 'error') {
+            throw new Error(data.message || 'Upload failed.');
+        }
+
+        // Got a job_id — start polling
+        processBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing…';
+        scannerLabel.textContent = 'AI INFERENCING…';
+        setProgress(5, 'AI is scanning frames…');
+        pollStatus(data.job_id);
+
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
+        processBtn.classList.add('ready');
+        processBtn.innerHTML = '<i class="fa-solid fa-microchip"></i> Analyze with YOLOv8';
+        scannerOverlay.style.display = 'none';
+    }
+}
+
+function pollStatus(jobId) {
+    pollInterval = setInterval(async () => {
+        try {
+            // Use cache: 'no-store' and a timestamp to completely bust browser caching
+            const r = await fetch(`${VIDEO_API_BASE}/api/status/${jobId}?t=${Date.now()}`, { cache: 'no-store' });
+            const data = await r.json();
+
+            // Update progress bar
+            const pct = data.progress || 0;
+            if (data.status === 'loading_model') {
+                setProgress(2, 'Loading AI model into memory…');
+                scannerLabel.textContent = 'LOADING YOLO MODEL…';
+            } else if (data.status === 'processing') {
+                setProgress(pct, `Processing frames… ${pct}%`);
+            } else if (data.status === 'converting') {
+                setProgress(99, 'Converting to web format…');
+                scannerLabel.textContent = 'CONVERTING VIDEO…';
+            } else if (data.status === 'done') {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                try {
+                    onProcessingComplete(data);
+                } catch(e) {
+                    alert('JS CRASH in onProcessingComplete:\n' + e.message + '\n' + e.stack);
+                }
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                alert('❌ Error processing video:\n' + data.message);
+                clearFile();
+            }
+        } catch (err) {
+            console.error(err);
+            // network hiccup, keep polling 
+        }
+    }, POLL_MS);
+}
+
+function onProcessingComplete(data) {
+    // Hide scanner, show video
+    scannerOverlay.style.display = 'none';
+    setProgress(100, 'Complete!');
+
+    resultVideo.src   = data.processed_video_url;
+    resultVideo.style.display = 'block';
+    resultVideo.load();
+    resultVideo.play().catch(() => {});
+
+    // Update stats
+    const total = (data.safe_count || 0) + (data.viol_count || 0);
+    const pct   = total > 0 ? Math.round((data.safe_count / total) * 100) : 0;
+    document.getElementById('safeCount').textContent  = data.safe_count ?? '--';
+    document.getElementById('violCount').textContent  = data.viol_count ?? '--';
+    document.getElementById('procTime').textContent   = (data.processing_time_sec ?? '--') + 's';
+    document.getElementById('compliance').textContent = pct + '%';
+    statsRow.classList.add('active');
+
+    // Show download button
+    downloadBtn.style.display = 'flex';
+    downloadBtn.onclick = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(data.processed_video_url);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.download_filename || 'analyzed_video.mp4';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Download failed: ' + err.message);
+        }
+    };
+
+    // Reset process button
+    processBtn.classList.add('ready');
+    processBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another';
+}
+
+function onProcessingError(msg) {
+    scannerOverlay.style.display = 'none';
+    playerPlaceholder.style.display = 'block';
+    playerPlaceholder.innerHTML = `
+        <i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i>
+        <h3 style="color:#ef4444;">Processing Failed</h3>
+        <p>${msg || 'An unknown error occurred.'}</p>
+    `;
+    processBtn.classList.add('ready');
+    processBtn.innerHTML = '<i class="fa-solid fa-microchip"></i> Try Again';
+    progressWrap.style.display = 'none';
+}
+</script>
+</body>
+</html>

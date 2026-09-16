@@ -27,18 +27,24 @@ log.setLevel(logging.ERROR)
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'employees')
 MATCH_THRESHOLD = 0.50 # face_recognition uses distance < 0.6 for match. 0.5 is strict.
 
+# ── LAZY LOADING ──────────────────────────────────────────────────────────────
+# Face encodings are NOT loaded at startup. They load when the user opens the
+# Face Recognition tab and unload when they leave to free memory.
 KNOWN_ENCODINGS = []
 KNOWN_NAMES = []
+face_db_loaded = False
 
 def load_known_faces():
-    global KNOWN_ENCODINGS, KNOWN_NAMES
+    global KNOWN_ENCODINGS, KNOWN_NAMES, face_db_loaded
+    if face_db_loaded:
+        return  # Already loaded, skip
     KNOWN_ENCODINGS = []
     KNOWN_NAMES = []
     
     total_images = 0
     start_time = time.time()
     
-    print(f"🔄 Initializing Employee Database into Memory...")
+    print(f"🔄 Loading Employee Face Database into Memory...")
     
     for root, dirs, files in os.walk(DB_PATH):
         for f in files:
@@ -59,8 +65,17 @@ def load_known_faces():
                     print(f"[WARN] Failed to process {path}: {e}")
                     
     elapsed = time.time() - start_time
-    print(f"✅ ATTENDANCE READY: Face Database ({total_images} images) loaded in {elapsed:.2f}s.")
-    print(f"🚀 Auth API is now active on http://127.0.0.1:5000")
+    face_db_loaded = True
+    print(f"✅ Face Database ({total_images} images) loaded in {elapsed:.2f}s.")
+
+def unload_known_faces():
+    global KNOWN_ENCODINGS, KNOWN_NAMES, face_db_loaded
+    if not face_db_loaded:
+        return
+    KNOWN_ENCODINGS = []
+    KNOWN_NAMES = []
+    face_db_loaded = False
+    print("[INFO] Face database unloaded from memory.")
 
 def get_confidence(distance):
     return max(0, round((1 - distance) * 100, 1))
@@ -120,6 +135,24 @@ def recognize_face():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+# ── Tab-based model lifecycle ─────────────────────────────────────────────────
+@app.route('/load-model', methods=['POST'])
+def load_model_endpoint():
+    """Called when user opens the Face Recognition tab."""
     load_known_faces()
+    return jsonify({"status": "ok", "message": "Face database loaded."})
+
+@app.route('/unload-model', methods=['POST'])
+def unload_model_endpoint():
+    """Called when user leaves the Face Recognition tab."""
+    unload_known_faces()
+    return jsonify({"status": "ok", "message": "Face database unloaded."})
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok", "loaded": face_db_loaded, "faces": len(KNOWN_ENCODINGS)})
+
+if __name__ == '__main__':
+    # Server starts lightweight — NO model loaded until user opens the tab
+    print(f"🚀 Face Recognition API listening on port 5000 (model will load on-demand)")
     app.run(host='0.0.0.0', port=5000, debug=False)

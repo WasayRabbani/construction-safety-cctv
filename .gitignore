@@ -1,5 +1,36 @@
+# Environment Variables (Keep your secrets safe!)
+.env
+
+# Node.js
 node_modules/
+package-lock.json
+
+# Python Virtual Environments & Cache
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 Face_recognition/.venv/
 Face_recognition/__pycache__/
-*.pt
+
+# Private / Processed Media
+Face_recognition/processed_videos/
+Face_recognition/employees/
+backend/uploads/
+hls/
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Models and Large Dependency Files (Don't upload these!)
 *.whl
+*.pt
+*.pkl
+
+# OS generated files
+.DS_Store
+Thumbs.db

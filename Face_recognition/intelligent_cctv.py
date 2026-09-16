@@ -64,9 +64,31 @@ import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-print(f"[INFO] Loading YOLO model: {MODEL_PATH}")
-yolo_model = YOLO(MODEL_PATH)
-yolo_model.overrides['verbose'] = False
+# ── LAZY MODEL LOADING ────────────────────────────────────────────────────────
+# YOLO model is NOT loaded at startup. It loads when the user opens the CCTV
+# tab (start_camera) and unloads when they leave (stop_camera) to free RAM/GPU.
+yolo_model = None
+yolo_model_lock = threading.Lock()
+
+def load_yolo_model():
+    global yolo_model
+    with yolo_model_lock:
+        if yolo_model is None:
+            print(f"[INFO] Loading YOLO model: {MODEL_PATH}")
+            yolo_model = YOLO(MODEL_PATH)
+            yolo_model.overrides['verbose'] = False
+            print(f"[INFO] YOLO model loaded and ready.")
+
+def unload_yolo_model():
+    global yolo_model
+    with yolo_model_lock:
+        if yolo_model is not None:
+            print("[INFO] Unloading YOLO model to free memory…")
+            del yolo_model
+            yolo_model = None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            print("[INFO] YOLO model unloaded. GPU/RAM freed.")
 
 global_frame = None
 latest_detections = []
@@ -76,38 +98,48 @@ metrics = {
     "current_fps": 0.0
 }
 
+KNOWN_ENCODINGS = []
+KNOWN_NAMES = []
+
 # ── PER-PERSON FACE TRACKING ──────────────────────────────────────────────────
 face_recognition_active = False
-recognized_faces = []  # [{"cx": int, "cy": int, "name": str, "time": float}]
-FACE_CACHE_TIMEOUT = 5.0   # seconds before a cached identity expires
+recognized_faces = []  # [{"cx": int, "cy": int, "name": str, "time": float, "last_scan": float}]
+FACE_CACHE_TIMEOUT = 5.0   # seconds before a cached identity expires completely
+FACE_SCAN_COOLDOWN = 1.5   # seconds to wait before trying to scan the SAME person again if failed
 FACE_MATCH_RADIUS  = 150   # pixels — max distance to reuse a cached name
 
-def find_cached_name(cx, cy):
-    """Find the closest cached identity near pixel position (cx, cy)."""
+def get_cached_face(cx, cy):
+    """Find the closest cached identity near pixel position (cx, cy). Returns (name, last_scan_time)"""
     now = time.time()
-    best_name = "Unknown"
     best_dist = FACE_MATCH_RADIUS
+    best_entry = None
     for entry in recognized_faces:
         if now - entry["time"] > FACE_CACHE_TIMEOUT:
             continue
         dist = abs(entry["cx"] - cx) + abs(entry["cy"] - cy)
         if dist < best_dist:
             best_dist = dist
-            best_name = entry["name"]
-    return best_name
+            best_entry = entry
+    
+    if best_entry:
+        return best_entry["name"], best_entry.get("last_scan", 0)
+    return "", 0
 
-def update_face_cache(cx, cy, name):
-    """Insert or update a cached identity at pixel position (cx, cy)."""
+def update_face_cache(cx, cy, name, is_scan_attempt=False):
+    """Insert or update a cached identity. If is_scan_attempt is True, just updates last_scan time."""
     now = time.time()
     for entry in recognized_faces:
         dist = abs(entry["cx"] - cx) + abs(entry["cy"] - cy)
         if dist < FACE_MATCH_RADIUS:
-            entry["name"] = name
-            entry["cx"] = cx
-            entry["cy"] = cy
-            entry["time"] = now
+            if not is_scan_attempt:
+                entry["name"] = name
+                entry["cx"] = cx
+                entry["cy"] = cy
+                entry["time"] = now
+            entry["last_scan"] = now
             return
-    recognized_faces.append({"cx": cx, "cy": cy, "name": name, "time": now})
+            
+    recognized_faces.append({"cx": cx, "cy": cy, "name": name, "time": now, "last_scan": now})
     # Purge stale entries
     recognized_faces[:] = [e for e in recognized_faces if now - e["time"] < FACE_CACHE_TIMEOUT * 2]
 
@@ -119,6 +151,13 @@ def run_face_recognition(crop_img, cx, cy):
             
         rgb_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
         
+        # Omit resizing if it's already small, otherwise scale down for SPEED
+        max_width = 150
+        if rgb_img.shape[1] > max_width:
+            ratio = max_width / rgb_img.shape[1]
+            rgb_img = cv2.resize(rgb_img, (max_width, int(rgb_img.shape[0] * ratio)))
+        
+        # 'hog' model is CPU based. Downscaling makes it ~4x faster!
         face_locations = face_recognition.face_locations(rgb_img, model="hog")
         if face_locations:
             unknown_encodings = face_recognition.face_encodings(rgb_img, face_locations)
@@ -131,7 +170,7 @@ def run_face_recognition(crop_img, cx, cy):
                         update_face_cache(cx, cy, worker_id)
                         print(f"[FACE] Recognized: {worker_id}")
                     else:
-                        update_face_cache(cx, cy, "Unknown")
+                        update_face_cache(cx, cy, "Unknown Person")
     except Exception as e:
         print("[WARN] Face Recognition Thread Error:", e)
     finally:
@@ -171,37 +210,42 @@ def background_ai_worker():
         print(f"[WARN] Database pre-build issue ({elapsed:.1f}s): {e}")
         print(f"[INFO] Will attempt to build cache on first face scan instead.")
 
+    ai_frame_counter = 0
+    AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame (Option C)
+
     while True:
-        if global_frame is None:
-            time.sleep(0.05)
+        if global_frame is None or not CAMERA_ACTIVE:
+            time.sleep(0.1)
+            continue
+
+        # Skip AI processing if model isn't loaded yet
+        if yolo_model is None:
+            time.sleep(0.1)
+            continue
+
+        # OPTION C: Skip frames — only run YOLO on every Nth frame
+        ai_frame_counter += 1
+        if ai_frame_counter % AI_SKIP_FRAMES != 0:
+            time.sleep(0.01)
             continue
 
         frame_copy = global_frame.copy()
 
         try:
-            # 1. Run YOLO (Extreme sensitivity mode)
-            # device=DEVICE : Automatically uses GPU if available
-            # half=True : Use FP16 for much faster GPU inference
-            # imgsz=640 : Standard YOLO resolution, extremely fast, stops the CPU/GPU from lagging the rest of the stream
-            # conf=0.15 : Balanced confidence for surveillance
+            # 1. Run YOLO
             results = yolo_model(frame_copy, imgsz=640,
                                  conf=0.15, iou=0.7, agnostic_nms=True, 
-                                 device=DEVICE, half=(DEVICE == 0), verbose=False)
+                                 device=DEVICE, verbose=False)
 
             new_detections = []
             safe_cnt = 0
             viol_cnt = 0
-            
-            # For debugging: collect what we found this frame
-            found_classes = []
 
             for result in results:
                 for box in result.boxes:
                     cls_name = yolo_model.names[int(box.cls)]
                     conf_val = float(box.conf)
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    
-                    found_classes.append(cls_name)
 
                     is_viol = cls_name in VIOLATIONS
                     if is_viol:
@@ -215,12 +259,13 @@ def background_ai_worker():
                     # 2. Per-person Face Recognition
                     box_cx = (x1 + x2) // 2
                     box_cy = (y1 + y2) // 2
+                    
+                    cached_name, last_scan = get_cached_face(box_cx, box_cy)
+                    name_to_display = cached_name if is_head and cached_name else ""
 
                     if is_head and not face_recognition_active:
-                        cached = find_cached_name(box_cx, box_cy)
-                        if cached == "Unknown":
-                            # Only scan faces we haven't identified yet
-                            # Increase padding significantly so hats don't cut off the face
+                        # Only scan if we don't know who they are, AND we haven't tried recently
+                        if cached_name in ["", "Unknown Person"] and (time.time() - last_scan) > FACE_SCAN_COOLDOWN:
                             h, w = frame_copy.shape[:2]
                             padding = 60
                             px1, py1 = max(0, x1 - padding), max(0, y1 - padding)
@@ -229,16 +274,12 @@ def background_ai_worker():
                             crop = frame_copy[py1:py2, px1:px2]
                             if crop.size > 0:
                                 face_recognition_active = True
+                                update_face_cache(box_cx, box_cy, cached_name, is_scan_attempt=True) # mark as scanned to trigger cooldown
                                 threading.Thread(target=run_face_recognition, args=(
                                     crop, box_cx, box_cy), daemon=True).start()
 
-                    # Each head box gets its own name from the spatial cache
-                    name_to_display = find_cached_name(box_cx, box_cy) if is_head else ""
-
                     new_detections.append(
                         (cls_name, conf_val, x1, y1, x2, y2, is_viol, name_to_display))
-
-            # detections logged only if needed for debugging
 
             # Atomic update for thread safety
             latest_detections = new_detections
@@ -249,9 +290,6 @@ def background_ai_worker():
             print("[ERROR] AI Thread Exception:", e)
             traceback.print_exc()
             time.sleep(1)  # Prevent tight crash loop
-
-        # Give CPU a breather. Targeting ~10-15 FPS for AI processing.
-        time.sleep(0.05)
 
 
 
@@ -423,18 +461,27 @@ cam_thread = threading.Thread(target=camera_worker, daemon=True)
 cam_thread.start()
 
 
+# OPTION A: Stream at full camera FPS (30+), overlaying cached AI detections.
+# The raw camera frame is always smooth. AI boxes update at their own speed.
 def generate_frames():
     global global_frame, latest_detections, metrics
 
     fps_deque = collections.deque(maxlen=30)
     prev_time = time.time()
+    TARGET_FPS = 30
+    frame_time = 1.0 / TARGET_FPS
 
     while True:
         if global_frame is None:
-            time.sleep(0.05)
+            time.sleep(0.03)
             continue
 
+        frame_start = time.time()
+
+        # Grab the latest raw camera frame (this updates at camera speed, ~30 FPS)
         frame = global_frame.copy()
+
+        # Overlay the CACHED AI detections on top (these update at AI speed)
         current_dets = list(latest_detections)
 
         for (cls_name, conf_val, x1, y1, x2, y2, is_viol, person_name) in current_dets:
@@ -474,16 +521,19 @@ def generate_frames():
             cv2.putText(frame, "  ALL PPE OK",
                         (10, frame.shape[0]-12), FONT, 0.7, (0, 0, 0), 2, cv2.LINE_AA)
 
-        # Broadcast immediately! JPEG quality 95 provides crystal clear image
+        # Encode JPEG — quality 80 gives crisp image at much smaller size for smoother streaming
         ret, buffer = cv2.imencode(
-            '.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+            '.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         if ret:
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-        # Minimal sleep so we yield thread control but stream as fast as possible (up to 100 FPS)
-        time.sleep(0.01)
+        # Pace the stream to the target FPS for smooth, consistent playback
+        elapsed = time.time() - frame_start
+        sleep_time = max(0, frame_time - elapsed)
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
 
 
@@ -495,15 +545,19 @@ def video_feed():
 @app.route('/start_camera', methods=['POST'])
 def start_camera():
     global CAMERA_ACTIVE
+    # Load YOLO model into memory when user opens CCTV tab
+    load_yolo_model()
     CAMERA_ACTIVE = True
-    print("[INFO] Camera started by frontend.")
+    print("[INFO] Camera + AI model started by frontend.")
     return jsonify({"status": "ok"})
 
 @app.route('/stop_camera', methods=['POST'])
 def stop_camera():
     global CAMERA_ACTIVE
     CAMERA_ACTIVE = False
-    print("[INFO] Camera stopped by frontend (Tab hidden/closed).")
+    # Unload YOLO model from memory when user leaves CCTV tab
+    unload_yolo_model()
+    print("[INFO] Camera + AI model stopped (Tab hidden/closed). Resources freed.")
     return jsonify({"status": "ok"})
 
 @app.route('/set_camera', methods=['POST'])
