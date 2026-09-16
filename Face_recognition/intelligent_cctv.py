@@ -8,6 +8,7 @@ import threading
 import traceback
 import subprocess
 import numpy as np
+import requests
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from ultralytics import YOLO
@@ -31,8 +32,8 @@ MODEL_PATH = 'best.pt'
 PORT = 5001
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
-# Absolute path to employees folder so DeepFace always finds it regardless of where the script is launched from
-EMPLOYEES_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'employees')
+# URL of the Node.js backend - reads from environment variable for cloud support
+BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:3000')
 
 # IMOU CAMERA CONFIGURATION
 # Replace the URL below with your actual camera RTSP link
@@ -183,10 +184,7 @@ def background_ai_worker():
     total_images = 0
     db_loaded = False
     ai_frame_counter = 0
-    AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame (Option C)
-
-    ai_frame_counter = 0
-    AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame (Option C)
+    AI_SKIP_FRAMES   = 2   # Run YOLO on every 2nd frame
 
     while True:
         if global_frame is None or not CAMERA_ACTIVE:
@@ -195,29 +193,38 @@ def background_ai_worker():
 
         if not db_loaded:
             start_time = time.time()
-            print(f"🔄 Initializing Employee Database into Memory...")
+            print(f"🔄 Loading Employee Face Database from Cloud...")
             try:
-                for root, dirs, files in os.walk(EMPLOYEES_DB):
-                    for f in files:
-                        if f.lower().endswith(('.jpg', '.jpeg', '.png')):
-                            total_images += 1
-                            path = os.path.join(root, f)
-                            worker_id = os.path.basename(root)
-                            try:
-                                if 'face_recognition' in globals():
-                                    img = cv2.imread(path)
-                                    if img is not None:
-                                        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                                        encodings = face_recognition.face_encodings(rgb_img)
-                                        if len(encodings) > 0:
-                                            KNOWN_ENCODINGS.append(encodings[0])
-                                            KNOWN_NAMES.append(worker_id)
-                            except:
-                                pass
+                # --- CORE LOGIC: Fetch face photos from backend API ---
+                resp = requests.get(f"{BACKEND_URL}/api/workers/face-database", timeout=15)
+                workers_data = resp.json()
+                
+                for entry in workers_data:
+                    worker_id = entry.get('worker_id')
+                    photo_url  = entry.get('photo_url')
+                    if not worker_id or not photo_url:
+                        continue
+                    try:
+                        if 'face_recognition' in globals():
+                            # Download the image bytes directly from Cloudinary
+                            img_bytes = requests.get(photo_url, timeout=10).content
+                            img_array = np.frombuffer(img_bytes, np.uint8)
+                            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                            if img is not None:
+                                rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                                encodings = face_recognition.face_encodings(rgb_img)
+                                if len(encodings) > 0:
+                                    KNOWN_ENCODINGS.append(encodings[0])
+                                    KNOWN_NAMES.append(worker_id)
+                                    total_images += 1
+                    except Exception as e:
+                        print(f"[WARN] Could not encode photo for {worker_id}: {e}")
+                
                 elapsed = time.time() - start_time
-                print(f"✅ SYSTEM READY: PPE Model and Face Database ({total_images} employees) loaded in {elapsed:.2f}s.")
+                print(f"✅ Face Database Ready: {total_images} photos loaded from cloud in {elapsed:.2f}s.")
             except Exception as e:
-                print(f"[WARN] Database pre-build issue: {e}")
+                print(f"[WARN] Could not load face database from API: {e}")
+                print(f"[INFO] Face recognition will be disabled until backend is reachable.")
             db_loaded = True
 
         # Skip AI processing if model isn't loaded yet

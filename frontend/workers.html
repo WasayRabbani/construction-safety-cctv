@@ -356,6 +356,19 @@
         .btn-cancel:hover { background: #333; }
         .loading { text-align: center; padding: 20px; color: #9CA3AF; }
         
+        .action-face { background: rgba(72, 187, 120, 0.2); color: #48bb78; border: 1px solid #48bb78; }
+        .action-face:hover { background: rgba(72, 187, 120, 0.4); }
+        .face-count-badge {
+            display: inline-block;
+            background: #48bb78;
+            color: #121212;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+        .face-count-badge.zero { background: #9CA3AF; }
         @media (max-width: 768px) {
             .form-row { grid-template-columns: 1fr; }
         }
@@ -524,6 +537,35 @@
         </div>
     </div>
 
+    <!-- Face Photo Upload Modal -->
+    <div id="faceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📷 Face Photos — <span id="faceModalWorkerName"></span></h2>
+                <button class="close-btn" onclick="closeFaceModal()">&times;</button>
+            </div>
+            <p style="color:#9CA3AF; margin-bottom:15px; font-size:13px;">Capture 5 face photos for the AI to recognize this worker on the CCTV camera.</p>
+            <div id="facePhotoCount" style="margin-bottom:15px; font-size:14px; color:#48bb78; font-weight:600;"></div>
+
+            <div style="text-align:center; margin-bottom:20px;">
+                <video id="faceWebcam" autoplay playsinline style="width:250px;height:250px;border-radius:12px;border:4px solid #48bb78;object-fit:cover;background:#2D2D2D;display:none;"></video>
+                <div id="facePlaceholder" style="width:250px;height:250px;border-radius:12px;border:4px dashed #444;background:#2D2D2D;display:flex;align-items:center;justify-content:center;font-size:48px;margin:0 auto;">📷</div>
+                <div style="margin-top:15px;">
+                    <button type="button" id="faceStartBtn" class="btn btn-success" onclick="startFaceWebcam()">Start Camera</button>
+                    <button type="button" id="faceCaptureBtn" class="btn btn-primary" style="display:none;" onclick="captureFaceBurst()">📸 Capture 5 Photos</button>
+                    <button type="button" id="faceRetakeBtn" class="btn btn-cancel" style="display:none;" onclick="resetFaceCapture()">↻ Retake</button>
+                </div>
+            </div>
+
+            <div id="faceThumbnails" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-cancel" onclick="closeFaceModal()">Cancel</button>
+                <button type="button" class="btn btn-success" id="faceUploadBtn" style="flex:1;display:none;" onclick="uploadFacePhotos()">☁️ Upload to Cloud</button>
+            </div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
     <script>
     // ========== ADD THIS TO EVERY PAGE ==========
@@ -559,6 +601,9 @@
     <script>
         
         let allWorkers = [];
+        let currentFaceWorkerId = null;
+        let faceStream = null;
+        let faceCapturedPhotos = [];
 
         async function loadStats() {
             try {
@@ -578,6 +623,16 @@
             try {
                 const response = await fetch(`${CONFIG.API_BASE}/workers`);
                 allWorkers = await response.json();
+
+                // Fetch face counts for all workers
+                const faceResp = await fetch(`${CONFIG.API_BASE}/workers/face-database`);
+                const faceDatabaseRows = await faceResp.json();
+                const faceCounts = {};
+                faceDatabaseRows.forEach(r => {
+                    faceCounts[r.worker_id] = (faceCounts[r.worker_id] || 0) + 1;
+                });
+                allWorkers = allWorkers.map(w => ({ ...w, face_count: faceCounts[w.worker_id] || 0 }));
+
                 displayWorkers(allWorkers);
             } catch (error) {
                 console.error('Error loading workers:', error);
@@ -599,7 +654,7 @@
                 
                 // Display photo or placeholder
                 const photoElement = w.photo_path 
-                    ? `<img src="http://localhost:4000${w.photo_path}" class="worker-photo-img" alt="${w.name}">`
+                    ? `<img src="${w.photo_path}" class="worker-photo-img" alt="${w.name}">`
                     : `<div class="worker-photo">${initial}</div>`;
                 
                 return `
@@ -639,8 +694,9 @@
                             </div>
                         </div>
                         <div class="worker-actions">
+                            <button class="action-btn action-face" onclick="openFaceModal('${w.worker_id}', '${w.name}')">📷 Faces <span class="face-count-badge ${(w.face_count||0) === 0 ? 'zero' : ''}">${w.face_count||0}</span></button>
                             <button class="action-btn action-edit" onclick='editWorker(${JSON.stringify(w)})'>✏️ Edit</button>
-                            <button class="action-btn action-delete" onclick="deleteWorker('${w.worker_id}', '${w.name}')">🗑️ Delete</button>
+                            <button class="action-btn action-delete" onclick="deleteWorker('${w.worker_id}', '${w.name}')">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -903,11 +959,128 @@
             }
         }
 
-        // Close modal when clicking outside
+        // Face Photo Modal Logic
+        let currentFaceWorkerId = null;
+        let faceStream = null;
+        let faceCapturedPhotos = [];
+
+        function openFaceModal(workerId, workerName) {
+            currentFaceWorkerId = workerId;
+            document.getElementById('faceModalWorkerName').textContent = workerName;
+            const w = allWorkers.find(x => x.worker_id === workerId);
+            const count = w ? (w.face_count || 0) : 0;
+            document.getElementById('facePhotoCount').textContent = count > 0
+                ? `✅ ${count} face photo(s) already registered for this worker.`
+                : `⚠️ No face photos yet. Capture 5 photos to enable AI recognition.`;
+            resetFaceCapture();
+            document.getElementById('faceModal').classList.add('active');
+        }
+
+        function closeFaceModal() {
+            document.getElementById('faceModal').classList.remove('active');
+            stopFaceWebcam();
+            resetFaceCapture();
+            currentFaceWorkerId = null;
+        }
+
+        async function startFaceWebcam() {
+            try {
+                faceStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('faceWebcam');
+                video.srcObject = faceStream;
+                video.style.display = 'block';
+                document.getElementById('facePlaceholder').style.display = 'none';
+                document.getElementById('faceStartBtn').style.display = 'none';
+                document.getElementById('faceCaptureBtn').style.display = 'inline-block';
+                document.getElementById('faceRetakeBtn').style.display = 'inline-block';
+            } catch (err) {
+                alert('Could not access camera. Please allow permissions.');
+            }
+        }
+
+        function stopFaceWebcam() {
+            if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); faceStream = null; }
+            document.getElementById('faceWebcam').style.display = 'none';
+            document.getElementById('faceCaptureBtn').style.display = 'none';
+            document.getElementById('faceRetakeBtn').style.display = 'none';
+        }
+
+        function resetFaceCapture() {
+            faceCapturedPhotos = [];
+            document.getElementById('faceThumbnails').innerHTML = '';
+            document.getElementById('faceUploadBtn').style.display = 'none';
+            const btn = document.getElementById('faceCaptureBtn');
+            if (btn) { btn.disabled = false; btn.textContent = '📸 Capture 5 Photos'; }
+        }
+
+        async function captureFaceBurst() {
+            const video = document.getElementById('faceWebcam');
+            const btn = document.getElementById('faceCaptureBtn');
+            btn.disabled = true;
+            btn.textContent = 'Capturing...';
+            faceCapturedPhotos = [];
+            document.getElementById('faceThumbnails').innerHTML = '';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+
+            for (let i = 0; i < 5; i++) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                faceCapturedPhotos.push(dataUrl);
+
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid #48bb78;';
+                document.getElementById('faceThumbnails').appendChild(img);
+
+                await new Promise(r => setTimeout(r, 400));
+            }
+
+            btn.textContent = '✅ 5 Photos Captured';
+            document.getElementById('faceUploadBtn').style.display = 'block';
+        }
+
+        async function uploadFacePhotos() {
+            if (faceCapturedPhotos.length === 0) return;
+            const btn = document.getElementById('faceUploadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading to Cloud...';
+
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/workers/${currentFaceWorkerId}/face-photos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ photos: faceCapturedPhotos })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`✅ ${result.message}`);
+                    closeFaceModal();
+                    loadWorkers();
+                } else {
+                    alert('Error: ' + result.error);
+                    btn.disabled = false;
+                    btn.textContent = '☁️ Upload to Cloud';
+                }
+            } catch (error) {
+                alert('Upload failed. Please try again.');
+                btn.disabled = false;
+                btn.textContent = '☁️ Upload to Cloud';
+            }
+        }
+
+        // Close modals when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('workerModal');
+            const faceModal = document.getElementById('faceModal');
             if (event.target === modal) {
                 closeModal();
+            }
+            if (event.target === faceModal) {
+                closeFaceModal();
             }
         }
 

@@ -35,6 +35,57 @@ async function saveWorkerPhotosAndInvalidateCache(worker_id, name, photos) {
 }
 
 
+// Get face database for Python AI — returns all face photos joined with worker info
+router.get('/face-database', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT fp.worker_id, w.name, fp.photo_url
+            FROM face_photos fp
+            JOIN workers w ON fp.worker_id = w.worker_id
+            ORDER BY fp.worker_id
+        `);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching face database:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Upload multiple face photos for a worker
+router.post('/:id/face-photos', async (req, res) => {
+    try {
+        const worker_id = req.params.id;
+        const { photos } = req.body; // array of base64 strings
+
+        if (!photos || photos.length === 0) {
+            return res.status(400).json({ error: 'No photos provided' });
+        }
+
+        const uploadedUrls = [];
+        for (let i = 0; i < photos.length; i++) {
+            const uploadResponse = await cloudinary.uploader.upload(photos[i], {
+                folder: 'ppe_faces',
+                public_id: `${worker_id}_face_${Date.now()}_${i}`
+            });
+            uploadedUrls.push(uploadResponse.secure_url);
+
+            // Insert each URL into face_photos table
+            await db.query(
+                'INSERT INTO face_photos (worker_id, photo_url) VALUES (?, ?)',
+                [worker_id, uploadResponse.secure_url]
+            );
+        }
+
+        res.status(201).json({
+            message: `${uploadedUrls.length} face photos uploaded successfully`,
+            urls: uploadedUrls
+        });
+    } catch (error) {
+        console.error('Error uploading face photos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get worker stats — MUST be before :id
 router.get('/stats/summary', async (req, res) => {
     try {
@@ -145,43 +196,13 @@ router.put('/:id', async (req, res) => {
 // Delete worker
 router.delete('/:id', async (req, res) => {
     try {
-        // Get worker info before deletion
-        const [worker] = await db.query('SELECT name, photo_path FROM workers WHERE worker_id = ?', [req.params.id]);
+        // Also delete associated face photos from DB (Cloudinary URLs)
+        await db.query('DELETE FROM face_photos WHERE worker_id = ?', [req.params.id]);
 
         const [result] = await db.query('DELETE FROM workers WHERE worker_id = ?', [req.params.id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Worker not found' });
-        }
-
-        // Delete photo file in uploads if it exists
-        if (worker.length > 0 && worker[0].photo_path) {
-            const photoPath = path.join(__dirname, '../../', worker[0].photo_path);
-            fs.unlink(photoPath, (err) => {
-                if (err) console.error('Error deleting upload photo:', err);
-            });
-        }
-
-        // Delete Face_recognition/employees/{name}/ folder so AI stops recognizing them
-        if (worker.length > 0 && worker[0].name) {
-            const safeName = (worker[0].name).toString().replace(/[^a-zA-Z0-9 ]/g, "").trim();
-            const employeeDir = path.join(__dirname, '../../Face_recognition/employees', safeName);
-            if (fs.existsSync(employeeDir)) {
-                fs.rmSync(employeeDir, { recursive: true, force: true });
-                console.log('[CLEANUP] Deleted employee folder: ' + employeeDir);
-            }
-
-            // Invalidate DeepFace cache so it re-indexes without this worker
-            const cacheDir = path.join(__dirname, '../../Face_recognition/employees');
-            try {
-                const files = fs.readdirSync(cacheDir);
-                files.forEach(f => {
-                    if (f.endsWith('.pkl')) {
-                        fs.unlinkSync(path.join(cacheDir, f));
-                        console.log('[CLEANUP] Deleted cache: ' + f);
-                    }
-                });
-            } catch (e) { console.error('Cache cleanup error:', e); }
         }
 
         res.json({ message: 'Worker deleted successfully' });
