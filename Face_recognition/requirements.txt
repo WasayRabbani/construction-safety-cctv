@@ -11,10 +11,10 @@ numpy<2
 cloudinary
 
 # --- FAST FACIAL RECOGNITION ---
-# Note: For Windows, it is highly recommended to install the pre-compiled dlib wheel
-# before running `pip install -r requirements.txt` to avoid Visual Studio C++ compiler errors.
-# dlib is installed via apt-get in Dockerfile to prevent OOM errors
-face_recognition
+# Local: dlib + face_recognition is installed manually in .venv (not in this file)
+# Cloud: facenet-pytorch uses PyTorch (already installed) — no C++ compilation!
+facenet-pytorch
+pillow
 
 # --- GPU ACCELERATION (OPTIONAL) ---
 # If you have an NVIDIA GPU, run these commands manually:

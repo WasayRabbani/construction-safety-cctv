@@ -9,15 +9,29 @@ import traceback
 import subprocess
 import numpy as np
 import requests
+from PIL import Image
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from ultralytics import YOLO
 import torch
 
+# ── FACE RECOGNITION BACKEND ─────────────────────────────────────────────────
+# Tries dlib/face_recognition first (fast, for local use).
+# Falls back to facenet-pytorch (no compilation required, for cloud/HF).
 try:
     import face_recognition
+    FACE_BACKEND = 'dlib'
+    print("[INFO] Face backend: dlib/face_recognition (local/fast)")
 except ImportError:
-    pass
+    try:
+        from facenet_pytorch import MTCNN, InceptionResnetV1
+        _mtcnn = MTCNN(image_size=160, margin=20, keep_all=False, device='cpu')
+        _resnet = InceptionResnetV1(pretrained='vggface2').eval()
+        FACE_BACKEND = 'facenet'
+        print("[INFO] Face backend: facenet-pytorch (cloud mode)")
+    except ImportError:
+        FACE_BACKEND = None
+        print("[WARN] No face recognition library found. Face ID disabled.")
 import imageio_ffmpeg
 # ── DEVICE DETECTION (GPU/CPU) ────────────────────────────────────────────────
 if torch.cuda.is_available():
@@ -144,34 +158,63 @@ def update_face_cache(cx, cy, name, is_scan_attempt=False):
     # Purge stale entries
     recognized_faces[:] = [e for e in recognized_faces if now - e["time"] < FACE_CACHE_TIMEOUT * 2]
 
+def _get_facenet_embedding(rgb_img):
+    """Use facenet-pytorch to extract a 512-d face embedding from an RGB image."""
+    try:
+        img_pil = Image.fromarray(rgb_img)
+        face_tensor = _mtcnn(img_pil)
+        if face_tensor is None:
+            return None
+        with torch.no_grad():
+            embedding = _resnet(face_tensor.unsqueeze(0))
+        return embedding.numpy().flatten()
+    except Exception:
+        return None
+
 def run_face_recognition(crop_img, cx, cy):
     global face_recognition_active
     try:
-        if 'face_recognition' not in globals():
+        if FACE_BACKEND is None:
             return
-            
+
         rgb_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
-        
-        # Omit resizing if it's already small, otherwise scale down for SPEED
-        max_width = 150
-        if rgb_img.shape[1] > max_width:
-            ratio = max_width / rgb_img.shape[1]
-            rgb_img = cv2.resize(rgb_img, (max_width, int(rgb_img.shape[0] * ratio)))
-        
-        # 'hog' model is CPU based. Downscaling makes it ~4x faster!
-        face_locations = face_recognition.face_locations(rgb_img, model="hog")
-        if face_locations:
-            unknown_encodings = face_recognition.face_encodings(rgb_img, face_locations)
-            if unknown_encodings and len(KNOWN_ENCODINGS) > 0:
-                distances = face_recognition.face_distance(KNOWN_ENCODINGS, unknown_encodings[0])
-                if len(distances) > 0:
-                    best_match_index = np.argmin(distances)
-                    if distances[best_match_index] < 0.50:
-                        worker_id = KNOWN_NAMES[best_match_index]
-                        update_face_cache(cx, cy, worker_id)
-                        print(f"[FACE] Recognized: {worker_id}")
-                    else:
-                        update_face_cache(cx, cy, "Unknown Person")
+
+        if FACE_BACKEND == 'dlib':
+            # ── Local mode: fast HOG-based dlib ──────────────────────────────
+            max_width = 150
+            if rgb_img.shape[1] > max_width:
+                ratio = max_width / rgb_img.shape[1]
+                rgb_img = cv2.resize(rgb_img, (max_width, int(rgb_img.shape[0] * ratio)))
+
+            face_locations = face_recognition.face_locations(rgb_img, model="hog")
+            if face_locations:
+                unknown_encodings = face_recognition.face_encodings(rgb_img, face_locations)
+                if unknown_encodings and len(KNOWN_ENCODINGS) > 0:
+                    distances = face_recognition.face_distance(KNOWN_ENCODINGS, unknown_encodings[0])
+                    if len(distances) > 0:
+                        best_match_index = np.argmin(distances)
+                        if distances[best_match_index] < 0.50:
+                            update_face_cache(cx, cy, KNOWN_NAMES[best_match_index])
+                            print(f"[FACE] Recognized: {KNOWN_NAMES[best_match_index]}")
+                        else:
+                            update_face_cache(cx, cy, "Unknown Person")
+
+        elif FACE_BACKEND == 'facenet':
+            # ── Cloud mode: facenet-pytorch ───────────────────────────────────
+            embedding = _get_facenet_embedding(rgb_img)
+            if embedding is not None and len(KNOWN_ENCODINGS) > 0:
+                # Cosine similarity comparison
+                sims = [
+                    float(np.dot(embedding, k) / (np.linalg.norm(embedding) * np.linalg.norm(k) + 1e-9))
+                    for k in KNOWN_ENCODINGS
+                ]
+                best_idx = int(np.argmax(sims))
+                if sims[best_idx] > 0.75:   # threshold for facenet cosine sim
+                    update_face_cache(cx, cy, KNOWN_NAMES[best_idx])
+                    print(f"[FACE] Recognized (facenet): {KNOWN_NAMES[best_idx]}")
+                else:
+                    update_face_cache(cx, cy, "Unknown Person")
+
     except Exception as e:
         print("[WARN] Face Recognition Thread Error:", e)
     finally:
@@ -205,8 +248,7 @@ def background_ai_worker():
                     if not worker_id or not photo_url:
                         continue
                     try:
-                        if 'face_recognition' in globals():
-                            # Download the image bytes directly from Cloudinary
+                        if FACE_BACKEND == 'dlib':
                             img_bytes = requests.get(photo_url, timeout=10).content
                             img_array = np.frombuffer(img_bytes, np.uint8)
                             img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
@@ -215,6 +257,17 @@ def background_ai_worker():
                                 encodings = face_recognition.face_encodings(rgb_img)
                                 if len(encodings) > 0:
                                     KNOWN_ENCODINGS.append(encodings[0])
+                                    KNOWN_NAMES.append(worker_id)
+                                    total_images += 1
+                        elif FACE_BACKEND == 'facenet':
+                            img_bytes = requests.get(photo_url, timeout=10).content
+                            img_array = np.frombuffer(img_bytes, np.uint8)
+                            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                            if img is not None:
+                                rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                                embedding = _get_facenet_embedding(rgb_img)
+                                if embedding is not None:
+                                    KNOWN_ENCODINGS.append(embedding)
                                     KNOWN_NAMES.append(worker_id)
                                     total_images += 1
                     except Exception as e:
