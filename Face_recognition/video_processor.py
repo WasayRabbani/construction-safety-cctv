@@ -20,7 +20,12 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from ultralytics import YOLO
 import imageio_ffmpeg
-import face_recognition
+try:
+    import face_recognition
+    FACE_BACKEND = 'dlib'
+except ImportError:
+    FACE_BACKEND = None
+    print("[INFO] face_recognition not available — face ID disabled in video processor.")
 
 # ── CONFIG ───────────────────────────────────────────────────
 PORT        = 5002
@@ -29,6 +34,11 @@ UPLOAD_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'processe
 OUTPUT_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'processed_videos', 'outputs')
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 EMPLOYEES_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'employees')
+
+# The base URL used to build the download link returned to the frontend.
+# Locally: master app runs on 7860 and mounts this at /video
+# Cloud:   set AI_BASE_URL env var to e.g. https://wasayrabbani-ppe-system.hf.space
+BASE_URL = os.environ.get('AI_BASE_URL', 'http://127.0.0.1:7860')
 
 KNOWN_ENCODINGS = []
 KNOWN_NAMES = []
@@ -366,7 +376,7 @@ def process_video_async(job_id, input_path, job_name):
                     'safe_count': safe_count,
                     'viol_count': viol_count,
                     'processing_time_sec': elapsed,
-                    'processed_video_url': f"http://127.0.0.1:{PORT}/outputs/{job_id}_annotated.mp4",
+                    'processed_video_url': f"{BASE_URL}/video/outputs/{job_id}_annotated.mp4",
                     'download_filename': f"{job_name}_annotated.mp4"
                 }
             })

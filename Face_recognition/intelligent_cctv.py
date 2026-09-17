@@ -47,7 +47,7 @@ PORT = 5001
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 # URL of the Node.js backend - reads from environment variable for cloud support
-BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:3000')
+BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:4000')
 
 # IMOU CAMERA CONFIGURATION
 # Replace the URL below with your actual camera RTSP link
@@ -243,8 +243,9 @@ def background_ai_worker():
                 workers_data = resp.json()
                 
                 for entry in workers_data:
-                    worker_id = entry.get('worker_id')
-                    photo_url  = entry.get('photo_url')
+                    worker_id   = entry.get('worker_id')
+                    worker_name = entry.get('name') or worker_id  # use real name, fallback to ID
+                    photo_url   = entry.get('photo_url')
                     if not worker_id or not photo_url:
                         continue
                     try:
@@ -257,7 +258,7 @@ def background_ai_worker():
                                 encodings = face_recognition.face_encodings(rgb_img)
                                 if len(encodings) > 0:
                                     KNOWN_ENCODINGS.append(encodings[0])
-                                    KNOWN_NAMES.append(worker_id)
+                                    KNOWN_NAMES.append(worker_name)  # store name, not ID
                                     total_images += 1
                         elif FACE_BACKEND == 'facenet':
                             img_bytes = requests.get(photo_url, timeout=10).content
@@ -268,7 +269,7 @@ def background_ai_worker():
                                 embedding = _get_facenet_embedding(rgb_img)
                                 if embedding is not None:
                                     KNOWN_ENCODINGS.append(embedding)
-                                    KNOWN_NAMES.append(worker_id)
+                                    KNOWN_NAMES.append(worker_name)  # store name, not ID
                                     total_images += 1
                     except Exception as e:
                         print(f"[WARN] Could not encode photo for {worker_id}: {e}")
@@ -552,12 +553,20 @@ def generate_frames():
             # Draw Box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-            # Draw Label
-            label = f"[{person_name}] {cls_name} {conf_val:.2f}"
+            # Draw PPE label (class + confidence) on the box
+            label = f"{cls_name} {conf_val:.2f}"
             (tw, th), _ = cv2.getTextSize(label, FONT, 0.55, 1)
             cv2.rectangle(frame, (x1, y1-th-8), (x1+tw+4, y1), color, -1)
             cv2.putText(frame, label, (x1+2, y1-4), FONT,
                         0.55, (0, 0, 0), 1, cv2.LINE_AA)
+
+            # Draw worker name above the box (only if recognized)
+            if person_name and person_name not in ("", "Unknown Person"):
+                name_color = (0, 220, 255)  # Cyan — stands out clearly
+                (nw, nh), _ = cv2.getTextSize(person_name, FONT, 0.6, 2)
+                cv2.rectangle(frame, (x1, y1-th-nh-20), (x1+nw+6, y1-th-10), (0, 0, 0), -1)
+                cv2.putText(frame, person_name, (x1+3, y1-th-14), FONT,
+                            0.6, name_color, 2, cv2.LINE_AA)
 
         # FPS Calculation
         now = time.time()

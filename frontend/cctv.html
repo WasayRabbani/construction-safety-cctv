@@ -313,7 +313,7 @@
                 <div class="feed-placeholder" id="loadingPlaceholder">
                     <div class="icon"><i class="fa-solid fa-robot"></i></div>
                     <div id="statusText" style="color: #FFC107; font-weight:bold;">Initializing Dual AI Stream...</div>
-                    <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Please ensure `intelligent_cctv.py`
+                    <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Please ensure <code>python app.py</code>
                         is running</div>
                 </div>
             </div>
@@ -381,11 +381,17 @@
         const statusBadge = document.getElementById('statusBadge');
         const cameraSelect = document.getElementById('cameraSelect');
 
-        // Load current camera setting from Python backend
-        fetch('http://127.0.0.1:5001/get_camera')
+        // Use CONFIG from config.js — works locally AND on cloud automatically
+        const CCTV_BASE = CONFIG.AI_CCTV_BASE;
+
+        // Load current camera setting from AI server
+        fetch(`${CCTV_BASE}/get_camera`)
             .then(r => r.json())
             .then(data => { cameraSelect.value = data.camera; })
             .catch(() => { });
+
+        // Set the initial MJPEG stream
+        img.src = `${CCTV_BASE}/video_feed`;
 
         // Camera switch handler
         cameraSelect.addEventListener('change', async () => {
@@ -394,13 +400,13 @@
             statusBadge.innerHTML = '<span class="recording-dot"></span> SWITCHING...';
 
             try {
-                await fetch('http://127.0.0.1:5001/set_camera', {
+                await fetch(`${CCTV_BASE}/set_camera`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ source: source })
                 });
                 // Reload the MJPEG stream with a cache-busting param
-                img.src = 'http://127.0.0.1:5001/video_feed?' + new Date().getTime();
+                img.src = `${CCTV_BASE}/video_feed?` + new Date().getTime();
             } catch (e) {
                 console.error('Camera switch failed:', e);
             }
@@ -416,7 +422,7 @@
         function handleStreamError() {
             img.style.display = 'none';
             placeholder.classList.remove('hidden');
-            document.getElementById('statusText').innerHTML = "Cannot connect to Stream.<br>Run <code>python intelligent_cctv.py</code>";
+            document.getElementById('statusText').innerHTML = "Cannot connect to Stream.<br>Ensure <code>python app.py</code> is running";
             document.getElementById('statusText').style.color = '#ef4444';
             statusBadge.className = 'status-badge';
             statusBadge.innerHTML = '<span class="recording-dot" style="background:#ef4444;"></span> OFFLINE';
@@ -424,15 +430,15 @@
             // Try to reconnect every 3 seconds
             setTimeout(() => {
                 img.style.display = 'block';
-                img.src = "http://127.0.0.1:5001/video_feed?" + new Date().getTime();
+                img.src = `${CCTV_BASE}/video_feed?` + new Date().getTime();
             }, 3000);
         }
         // --- Tab Visibility & Camera Cleanup Logic ---
         function notifyCameraState(active) {
             if (active) {
-                fetch('http://127.0.0.1:5001/start_camera', { method: 'POST' }).catch(() => { });
+                fetch(`${CCTV_BASE}/start_camera`, { method: 'POST' }).catch(() => { });
             } else {
-                fetch('http://127.0.0.1:5001/stop_camera', { method: 'POST', keepalive: true }).catch(() => { });
+                fetch(`${CCTV_BASE}/stop_camera`, { method: 'POST', keepalive: true }).catch(() => { });
             }
         }
 

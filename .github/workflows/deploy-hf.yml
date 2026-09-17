@@ -23,15 +23,12 @@ jobs:
           python-version: '3.10'
           
       - name: Install Hugging Face CLI
-        run: pip install huggingface_hub
+        run: pip install -U huggingface_hub
         
-      - name: Sync AI to Hugging Face Space
+      - name: Deploy to Hugging Face Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           echo "🚀 Deploying Master AI Server to Hugging Face Spaces..."
-          
-        
-          hf upload wasayrabbani/ppe-system ./Face_recognition / --repo-type space --token $HF_TOKEN
-          
+          hf upload wasayrabbani/ppe-system ./Face_recognition . --repo-type space --token $HF_TOKEN
           echo "✅ Deployment Successful!"

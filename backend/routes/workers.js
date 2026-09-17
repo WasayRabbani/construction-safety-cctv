@@ -7,6 +7,13 @@ const fs = require('fs');
 // Boilerplate: Import Cloudinary
 const cloudinary = require('cloudinary').v2;
 
+// Boilerplate: Configure Cloudinary with .env credentials
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key:    process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 // Core Logic: Upload to Cloudinary instead of Local Disk
 async function saveWorkerPhotosAndInvalidateCache(worker_id, name, photos) {
     if (!photos || photos.length === 0) return null;
