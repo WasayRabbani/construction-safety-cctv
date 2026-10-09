@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
 // Boilerplate: Import Cloudinary
 const cloudinary = require('cloudinary').v2;
@@ -57,15 +58,14 @@ router.get('/face-database', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
 // Upload multiple face photos for a worker
-router.post('/:id/face-photos', async (req, res) => {
+router.post('/:id/face-photos', authenticateToken, authorizeRoles('admin', 'supervisor', 'hr'), async (req, res) => {
     try {
         const worker_id = req.params.id;
-        const { photos } = req.body; // array of base64 strings
+        const { photos } = req.body;
 
-        if (!photos || photos.length === 0) {
-            return res.status(400).json({ error: 'No photos provided' });
+        if (!photos || !Array.isArray(photos) || photos.length === 0) {
+            return res.status(400).json({ error: 'Valid array of photos is required' });
         }
 
         const uploadedUrls = [];
@@ -76,7 +76,6 @@ router.post('/:id/face-photos', async (req, res) => {
             });
             uploadedUrls.push(uploadResponse.secure_url);
 
-            // Insert each URL into face_photos table
             await db.query(
                 'INSERT INTO face_photos (worker_id, photo_url) VALUES (?, ?)',
                 [worker_id, uploadResponse.secure_url]
@@ -89,41 +88,47 @@ router.post('/:id/face-photos', async (req, res) => {
         });
     } catch (error) {
         console.error('Error uploading face photos:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error while uploading photos' });
     }
 });
 
 // Get worker stats — MUST be before :id
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', authenticateToken, async (req, res) => {
     try {
         const [stats] = await db.query(`
             SELECT 
                 COUNT(*) as total_workers,
                 SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_workers,
                 SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_workers,
-                SUM(CASE WHEN MONTH(join_date) = MONTH(NOW()) AND YEAR(join_date) = YEAR(NOW()) THEN 1 ELSE 0 END) as new_this_month
+                SUM(CASE WHEN strftime('%m', join_date) = strftime('%m', 'now') AND strftime('%Y', join_date) = strftime('%Y', 'now') THEN 1 ELSE 0 END) as new_this_month
             FROM workers
         `);
-        res.json(stats[0]);
+        res.json(stats[0] || {});
     } catch (error) {
         console.error('Error fetching stats:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to retrieve worker statistics' });
     }
 });
 
-// Get all workers
-router.get('/', async (req, res) => {
+// Get all workers (Paginated to prevent memory exhaustion - Rule 8 & 9)
+router.get('/', authenticateToken, async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM workers ORDER BY worker_id ASC');
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+        const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+        const [rows] = await db.query(
+            'SELECT * FROM workers ORDER BY worker_id ASC LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
         res.json(rows);
     } catch (error) {
         console.error('Error fetching workers:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to retrieve workers list' });
     }
 });
 
 // Get single worker
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM workers WHERE worker_id = ?', [req.params.id]);
         if (rows.length === 0) {
@@ -132,17 +137,22 @@ router.get('/:id', async (req, res) => {
         res.json(rows[0]);
     } catch (error) {
         console.error('Error fetching worker:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to retrieve worker details' });
     }
 });
 
 // Create new worker with auto photo sync
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, authorizeRoles('admin', 'supervisor', 'hr'), async (req, res) => {
     try {
         const { worker_id, name, cnic, phone, department, wage_type, wage_rate, join_date, photos } = req.body;
 
+        // Rule 4: Validate inputs
         if (!worker_id || !name || !cnic || !wage_type || !wage_rate || !join_date) {
-            return res.status(400).json({ error: 'Missing required fields' });
+            return res.status(400).json({ error: 'Missing required fields: worker_id, name, cnic, wage_type, wage_rate, join_date' });
+        }
+
+        if (!['hourly', 'daily'].includes(wage_type)) {
+            return res.status(400).json({ error: "wage_type must be either 'hourly' or 'daily'" });
         }
 
         let photo_path = null;
@@ -150,24 +160,23 @@ router.post('/', async (req, res) => {
             photo_path = await saveWorkerPhotosAndInvalidateCache(worker_id, name, photos);
         }
 
-        const [result] = await db.query(
+        await db.query(
             `INSERT INTO workers (worker_id, name, cnic, phone, department, wage_type, wage_rate, join_date, photo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [worker_id, name, cnic, phone, department, wage_type, wage_rate, join_date, photo_path]
+            [worker_id, name, cnic, phone || null, department || null, wage_type, parseFloat(wage_rate), join_date, photo_path]
         );
 
         res.status(201).json({ message: 'Worker created successfully', worker_id, photo_path });
     } catch (error) {
         console.error('Error creating worker:', error);
-        if (error.code === 'ER_DUP_ENTRY') {
-            res.status(400).json({ error: 'Worker ID or CNIC already exists' });
-        } else {
-            res.status(500).json({ error: error.message });
+        if (error.message && error.message.includes('UNIQUE constraint failed')) {
+            return res.status(409).json({ error: 'Worker ID or CNIC already exists' });
         }
+        res.status(500).json({ error: 'Internal server error while creating worker' });
     }
 });
 
-// Update worker with optional photo upload
-router.put('/:id', async (req, res) => {
+// Update worker
+router.put('/:id', authenticateToken, authorizeRoles('admin', 'supervisor', 'hr'), async (req, res) => {
     try {
         const { name, cnic, phone, department, wage_type, wage_rate, status, photos, existing_photo_path } = req.body;
         const worker_id = req.params.id;
@@ -180,7 +189,6 @@ router.put('/:id', async (req, res) => {
         if (photos && photos.length > 0) {
             photo_path = await saveWorkerPhotosAndInvalidateCache(worker_id, name, photos);
 
-            // Delete old photo in uploads if we generated a new one
             if (existing[0].photo_path && photo_path && photo_path !== existing[0].photo_path) {
                 const oldPhotoPath = path.join(__dirname, '../../', existing[0].photo_path);
                 if (fs.existsSync(oldPhotoPath)) fs.unlinkSync(oldPhotoPath);
@@ -196,16 +204,14 @@ router.put('/:id', async (req, res) => {
         res.json({ message: 'Worker updated successfully', photo_path });
     } catch (error) {
         console.error('Error updating worker:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error while updating worker' });
     }
 });
 
 // Delete worker
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
-        // Also delete associated face photos from DB (Cloudinary URLs)
         await db.query('DELETE FROM face_photos WHERE worker_id = ?', [req.params.id]);
-
         const [result] = await db.query('DELETE FROM workers WHERE worker_id = ?', [req.params.id]);
 
         if (result.affectedRows === 0) {
@@ -215,7 +221,7 @@ router.delete('/:id', async (req, res) => {
         res.json({ message: 'Worker deleted successfully' });
     } catch (error) {
         console.error('Error deleting worker:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error while deleting worker' });
     }
 });
 

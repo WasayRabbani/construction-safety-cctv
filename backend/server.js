@@ -24,7 +24,6 @@ const attendanceRoutes = require('./routes/attendance');
 const violationsRoutes = require('./routes/violations');
 const salaryRoutes = require('./routes/salary');
 const healthRoutes = require('./routes/health');
-const testRoutes = require('./routes/test');
 const faceAttendanceRoutes = require('./routes/face_attendance');
 
 app.use('/api/auth', authRoutes);
@@ -33,7 +32,6 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/violations', violationsRoutes);
 app.use('/api/salary', salaryRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/test', testRoutes);
 app.use('/api/face-attendance', faceAttendanceRoutes);
 
 // =======================

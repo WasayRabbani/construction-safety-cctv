@@ -5,18 +5,21 @@ const db = require('../config/database');
 // Proxy to the Python Flask server
 router.post('/scan', async (req, res) => {
     try {
-        const { image } = req.body;
-        
+        const { image, ai_base_url } = req.body;
+
         if (!image) {
             return res.status(400).json({ success: false, error: 'No image provided' });
         }
 
         // Using native Node 18+ fetch API instead of node-fetch
-        // Ensure Python API is running on port 5000
-        const faceApiUrl = process.env.AI_FACE_API_URL || 'http://127.0.0.1:7860/face';
+        // Ensure Python API is running on port 7860
+        const faceApiUrl = ai_base_url || process.env.AI_FACE_API_URL || 'http://127.0.0.1:7860/face';
         const pythonResponse = await fetch(`${faceApiUrl}/recognize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
             body: JSON.stringify({ image: image })
         });
 
@@ -30,24 +33,24 @@ router.post('/scan', async (req, res) => {
         if (data.status === 'match') {
             const employeeWorkerId = data.worker_id;
             const confidence = data.confidence;
-            
+
             // 3. Find target employee in the workers table by worker_id OR name
             // (Since we updated the folder creation logic to use Names instead of IDs)
             const [workers] = await db.query(
-                'SELECT * FROM workers WHERE worker_id = ? OR name = ? OR REPLACE(name, " ", "") = ?', 
+                'SELECT * FROM workers WHERE worker_id = ? OR name = ? OR REPLACE(name, " ", "") = ?',
                 [employeeWorkerId, employeeWorkerId, employeeWorkerId]
             );
-            
+
             if (workers.length === 0) {
-                return res.status(404).json({ 
-                    success: false, 
-                    message: `Face matched '${employeeWorkerId}', but this could not be found in the database.` 
+                return res.status(404).json({
+                    success: false,
+                    message: `Face matched '${employeeWorkerId}', but this could not be found in the database.`
                 });
             }
 
             const worker = workers[0];
             const checkInTime = new Date();
-            
+
             // Check if already checked in today
             const [existing] = await db.query(
                 'SELECT * FROM attendance WHERE worker_id = ? AND DATE(check_in_time) = CURDATE()',
@@ -55,8 +58,8 @@ router.post('/scan', async (req, res) => {
             );
 
             if (existing.length > 0) {
-                return res.json({ 
-                    success: true, 
+                return res.json({
+                    success: true,
                     message: `${worker.name} is already checked in for today!`,
                     worker: worker,
                     confidence: confidence
@@ -66,7 +69,7 @@ router.post('/scan', async (req, res) => {
             // Determine if late (assuming work starts at 8 AM)
             const hour = checkInTime.getHours();
             const status = (hour > 8 || (hour === 8 && checkInTime.getMinutes() > 30)) ? 'late' : 'present';
-            
+
             // Auto check-in
             await db.query(
                 'INSERT INTO attendance (worker_id, check_in_time, status, location) VALUES (?, ?, ?, ?)',
@@ -79,7 +82,7 @@ router.post('/scan', async (req, res) => {
                 worker: worker,
                 confidence: confidence
             });
-            
+
         } else if (data.status === 'unknown') {
             return res.json({
                 success: false,

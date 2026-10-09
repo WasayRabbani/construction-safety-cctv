@@ -4,6 +4,19 @@ const router = express.Router();
 const db = require('../config/database');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+
+// Rule 8 (Limit Resource Usage): Prevent brute-force password attacks
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Max 10 attempts per IP per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: 'Too many login attempts. Please try again after 15 minutes.'
+    }
+});
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -66,14 +79,6 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        // Validate username length
-        if (username.length < 3) {
-            return res.status(400).json({
-                success: false,
-                error: 'Username must be at least 3 characters'
-            });
-        }
-
         // Validate password length
         if (password.length < 6) {
             return res.status(400).json({
@@ -120,7 +125,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login Route
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
 
