@@ -31,20 +31,31 @@ router.post('/scan', async (req, res) => {
 
         // 2. Handle the result
         if (data.status === 'match') {
-            const employeeWorkerId = data.worker_id;
+            // The AI returns the worker's folder name (= their full name, e.g. "Abdul Wasay Rabbani").
+            // The DB worker_id is a short code like "W001", so we MUST search by name.
+            const recognizedName = (data.worker_id || '').trim();
             const confidence = data.confidence;
 
-            // 3. Find target employee in the workers table by worker_id OR name (case-insensitive)
-            const cleanId = (employeeWorkerId || '').trim();
+            // Search by name (case-insensitive, trimmed).
+            // Also try matching on first+last name without middle name as a fallback.
+            const nameParts = recognizedName.split(/\s+/);
+            const shortName = nameParts.length >= 2
+                ? `${nameParts[0]} ${nameParts[nameParts.length - 1]}`
+                : recognizedName;
+
             const [workers] = await db.query(
-                'SELECT * FROM workers WHERE LOWER(worker_id) = LOWER(?) OR LOWER(name) = LOWER(?) OR LOWER(REPLACE(name, " ", "")) = LOWER(?)',
-                [cleanId, cleanId, cleanId]
+                `SELECT * FROM workers 
+                 WHERE LOWER(TRIM(name)) = LOWER(?)
+                    OR LOWER(TRIM(name)) = LOWER(?)
+                    OR LOWER(TRIM(worker_id)) = LOWER(?)
+                 LIMIT 1`,
+                [recognizedName, shortName, recognizedName]
             );
 
             if (workers.length === 0) {
                 return res.status(404).json({
                     success: false,
-                    message: `Face matched '${employeeWorkerId}', but this could not be found in the database.`
+                    message: `Face matched '${recognizedName}', but no worker with this name was found in the database. Please ensure the worker's name in the system matches the folder name in ai_services/employees/.`
                 });
             }
 

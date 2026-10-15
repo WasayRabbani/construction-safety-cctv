@@ -81,7 +81,6 @@ async function saveWorkerPhotosAndInvalidateCache(worker_id, name, photos) {
     return avatarUrl;
 }
 
-
 // Get face database for Python AI — returns all face photos joined with worker info
 router.get('/face-database', async (req, res) => {
     try {
@@ -97,6 +96,7 @@ router.get('/face-database', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
 // Upload multiple face photos for a worker
 router.post('/:id/face-photos', authenticateToken, authorizeRoles('admin', 'supervisor', 'hr'), async (req, res) => {
     try {
@@ -258,17 +258,73 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'supervisor', 'hr'
     }
 });
 
-// Delete worker
-router.delete('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+// Helper: Extract Cloudinary public_id from secure URL
+function getCloudinaryPublicId(url) {
+    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return null;
     try {
-        await db.query('DELETE FROM face_photos WHERE worker_id = ?', [req.params.id]);
-        const [result] = await db.query('DELETE FROM workers WHERE worker_id = ?', [req.params.id]);
+        const parts = url.split('/upload/');
+        if (parts.length < 2) return null;
+        let pathWithExt = parts[1].replace(/^v\d+\//, '');
+        const lastDotIdx = pathWithExt.lastIndexOf('.');
+        return lastDotIdx !== -1 ? pathWithExt.substring(0, lastDotIdx) : pathWithExt;
+    } catch {
+        return null;
+    }
+}
+
+// Delete worker (cleans up Cloudinary, local disk folder, and database records)
+router.delete('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    const workerId = req.params.id;
+    try {
+        // 1. Fetch worker and face photos before deletion
+        const [workers] = await db.query('SELECT name, photo_path FROM workers WHERE worker_id = ?', [workerId]);
+        if (workers.length === 0) {
+            return res.status(404).json({ error: 'Worker not found' });
+        }
+        const worker = workers[0];
+        const [facePhotos] = await db.query('SELECT photo_url FROM face_photos WHERE worker_id = ?', [workerId]);
+
+        // 2. Delete face images and avatar from Cloudinary
+        const cloudinaryUrls = [
+            worker.photo_path,
+            ...facePhotos.map(p => p.photo_url)
+        ].filter(Boolean);
+
+        for (const url of cloudinaryUrls) {
+            const publicId = getCloudinaryPublicId(url);
+            if (publicId) {
+                try {
+                    await cloudinary.uploader.destroy(publicId);
+                    console.log(`☁️ Cloudinary image deleted: ${publicId}`);
+                } catch (cErr) {
+                    console.warn(`Failed to delete Cloudinary asset (${publicId}):`, cErr.message);
+                }
+            }
+        }
+
+        // 3. Delete worker's photos folder from local disk (ai_services/employees/<Worker Name>)
+        if (worker.name) {
+            const safeName = worker.name.trim().replace(/[\\/:*?"<>|]/g, '');
+            const targetDir = path.join(__dirname, '..', '..', 'ai_services', 'employees', safeName);
+            if (fs.existsSync(targetDir)) {
+                try {
+                    fs.rmSync(targetDir, { recursive: true, force: true });
+                    console.log(`💾 Local disk folder deleted: ${targetDir}`);
+                } catch (fErr) {
+                    console.warn(`Failed to delete local folder (${targetDir}):`, fErr.message);
+                }
+            }
+        }
+
+        // 4. Delete records from database
+        await db.query('DELETE FROM face_photos WHERE worker_id = ?', [workerId]);
+        const [result] = await db.query('DELETE FROM workers WHERE worker_id = ?', [workerId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Worker not found' });
         }
 
-        res.json({ message: 'Worker deleted successfully' });
+        res.json({ message: 'Worker, local face photos, and cloud data deleted successfully' });
     } catch (error) {
         console.error('Error deleting worker:', error);
         res.status(500).json({ error: 'Internal server error while deleting worker' });
