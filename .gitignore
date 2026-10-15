@@ -38,3 +38,20 @@ hls/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Archives & Backups
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# AI Models and Weights
+*.whl
+*.pt
+*.pkl
+*.onnx
+
+# Face Photos & Embeddings
+ai_services/employees/
+ai_services/employees.zip
+
