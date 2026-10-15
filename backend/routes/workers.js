@@ -15,31 +15,70 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Core Logic: Upload to Cloudinary instead of Local Disk
+// Helper: Save Base64 face photos to local disk (ai_services/employees/<Worker Name>/)
+function savePhotosToLocalDisk(workerName, photos) {
+    if (!photos || !Array.isArray(photos) || photos.length === 0 || !workerName) return [];
+
+    const safeName = workerName.trim().replace(/[\\/:*?"<>|]/g, '');
+    const targetDir = path.join(__dirname, '..', '..', 'ai_services', 'employees', safeName);
+
+    if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const savedLocalPaths = [];
+    photos.forEach((base64Str, idx) => {
+        try {
+            const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+            const imageBuffer = matches ? Buffer.from(matches[2], 'base64') : Buffer.from(base64Str, 'base64');
+            const fileName = `photo_${Date.now()}_${idx}.jpg`;
+            const filePath = path.join(targetDir, fileName);
+            fs.writeFileSync(filePath, imageBuffer);
+            savedLocalPaths.push(filePath);
+        } catch (err) {
+            console.error(`Failed to write local face image ${idx} for ${safeName}:`, err);
+        }
+    });
+
+    console.log(`💾 Saved ${savedLocalPaths.length} photo(s) to local disk: ${targetDir}`);
+    return savedLocalPaths;
+}
+
+// Core Logic: Dual storage - local disk + Cloudinary
 async function saveWorkerPhotosAndInvalidateCache(worker_id, name, photos) {
     if (!photos || photos.length === 0) return null;
 
-    let photoPathToSaveInDB = null;
+    // 1. Save all burst photos to local disk immediately
+    savePhotosToLocalDisk(name, photos);
+
+    let avatarUrl = null;
 
     try {
-        // Upload the first photo to Cloudinary directly from the Base64 string!
+        // 2. Upload first photo as main worker profile avatar
         const uploadResponse = await cloudinary.uploader.upload(photos[0], {
             folder: 'ppe_workers',
             public_id: `${worker_id}_${Date.now()}`
         });
+        avatarUrl = uploadResponse.secure_url;
+        console.log("Successfully uploaded avatar to Cloudinary:", avatarUrl);
 
-        // Save the public internet URL to your database!
-        photoPathToSaveInDB = uploadResponse.secure_url;
-        console.log("Successfully uploaded to Cloudinary:", photoPathToSaveInDB);
-
+        // 3. Upload all photos to face_photos table for CCTV face database sync
+        for (let i = 0; i < photos.length; i++) {
+            const faceUpload = await cloudinary.uploader.upload(photos[i], {
+                folder: 'ppe_faces',
+                public_id: `${worker_id}_face_${Date.now()}_${i}`
+            });
+            await db.query(
+                'INSERT INTO face_photos (worker_id, photo_url) VALUES (?, ?)',
+                [worker_id, faceUpload.secure_url]
+            );
+        }
+        console.log(`☁️ Uploaded ${photos.length} photos to Cloudinary face_photos`);
     } catch (error) {
         console.error("Cloudinary Upload Error:", error);
     }
 
-    // TODO: Later, we will add code here to send a ping to Hugging Face
-    // so it knows a new worker was added!
-
-    return photoPathToSaveInDB;
+    return avatarUrl;
 }
 
 
@@ -68,6 +107,17 @@ router.post('/:id/face-photos', authenticateToken, authorizeRoles('admin', 'supe
             return res.status(400).json({ error: 'Valid array of photos is required' });
         }
 
+        // Retrieve worker name for disk storage
+        const [workers] = await db.query('SELECT name FROM workers WHERE worker_id = ?', [worker_id]);
+        if (workers.length === 0) {
+            return res.status(404).json({ error: 'Worker not found' });
+        }
+        const workerName = workers[0].name;
+
+        // 1. Save to local disk in ai_services/employees/<workerName>/
+        savePhotosToLocalDisk(workerName, photos);
+
+        // 2. Upload to Cloudinary and save into face_photos table
         const uploadedUrls = [];
         for (let i = 0; i < photos.length; i++) {
             const uploadResponse = await cloudinary.uploader.upload(photos[i], {
@@ -83,7 +133,7 @@ router.post('/:id/face-photos', authenticateToken, authorizeRoles('admin', 'supe
         }
 
         res.status(201).json({
-            message: `${uploadedUrls.length} face photos uploaded successfully`,
+            message: `${uploadedUrls.length} face photos saved locally and uploaded to cloud`,
             urls: uploadedUrls
         });
     } catch (error) {

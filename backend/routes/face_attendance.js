@@ -34,11 +34,11 @@ router.post('/scan', async (req, res) => {
             const employeeWorkerId = data.worker_id;
             const confidence = data.confidence;
 
-            // 3. Find target employee in the workers table by worker_id OR name
-            // (Since we updated the folder creation logic to use Names instead of IDs)
+            // 3. Find target employee in the workers table by worker_id OR name (case-insensitive)
+            const cleanId = (employeeWorkerId || '').trim();
             const [workers] = await db.query(
-                'SELECT * FROM workers WHERE worker_id = ? OR name = ? OR REPLACE(name, " ", "") = ?',
-                [employeeWorkerId, employeeWorkerId, employeeWorkerId]
+                'SELECT * FROM workers WHERE LOWER(worker_id) = LOWER(?) OR LOWER(name) = LOWER(?) OR LOWER(REPLACE(name, " ", "")) = LOWER(?)',
+                [cleanId, cleanId, cleanId]
             );
 
             if (workers.length === 0) {
