@@ -5,7 +5,8 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js"
+    "dev": "nodemon backend/server.js",
+    "audit": "node test_backend_audit.js"
   },
   "keywords": [
     "construction",
@@ -31,6 +32,7 @@
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
     "mysql2": "^3.22.1",
+    "sqlite3": "^6.0.1",
     "ws": "^8.14.2"
   },
   "devDependencies": {

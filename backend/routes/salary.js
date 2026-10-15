@@ -194,4 +194,199 @@ router.post('/process-payroll', authenticateToken, authorizeRoles('admin', 'acco
     }
 });
 
+/**
+ * Helper: Calculates payroll for a single worker for a specified pay_period (YYYY-MM).
+ * Aggregates attendance hours/days from 'attendance' and non-waived fines from 'fines'.
+ * Rule 1, 3 & 11: Server-side business logic.
+ */
+async function calculateWorkerPayroll(worker_id, pay_period) {
+    // 1. Fetch worker wage details
+    const [workers] = await db.query(
+        'SELECT worker_id, name, wage_type, wage_rate FROM workers WHERE worker_id = ?',
+        [worker_id]
+    );
+
+    if (workers.length === 0) {
+        throw new Error(`Worker with ID '${worker_id}' not found`);
+    }
+
+    const worker = workers[0];
+    const wageRate = parseFloat(worker.wage_rate) || 0;
+
+    // 2. Aggregate attendance for pay_period (YYYY-MM)
+    const [attendanceRows] = await db.query(`
+        SELECT 
+            COUNT(*) as days_worked,
+            SUM(COALESCE(working_hours, 8)) as hours_worked
+        FROM attendance
+        WHERE worker_id = ? 
+          AND strftime('%Y-%m', attendance_date) = ?
+          AND status IN ('present', 'late')
+    `, [worker_id, pay_period]);
+
+    const daysWorked = parseInt(attendanceRows[0]?.days_worked) || 0;
+    const hoursWorked = parseFloat(attendanceRows[0]?.hours_worked) || 0;
+
+    // 3. Calculate gross salary based on wage type
+    let grossSalary = 0;
+    if (worker.wage_type === 'hourly') {
+        grossSalary = hoursWorked * wageRate;
+    } else {
+        grossSalary = daysWorked * wageRate;
+    }
+
+    // 4. Aggregate active fines for pay_period
+    const [fineRows] = await db.query(`
+        SELECT 
+            SUM(fine_amount) as total_fines,
+            SUM(CASE WHEN fine_type = 'violation' THEN fine_amount ELSE 0 END) as violation_fines,
+            SUM(CASE WHEN fine_type = 'absence' THEN fine_amount ELSE 0 END) as absence_fines,
+            SUM(CASE WHEN fine_type = 'late' THEN fine_amount ELSE 0 END) as late_fines,
+            SUM(CASE WHEN fine_type = 'other' THEN fine_amount ELSE 0 END) as other_fines
+        FROM fines
+        WHERE worker_id = ? 
+          AND strftime('%Y-%m', fine_date) = ?
+          AND status != 'waived'
+    `, [worker_id, pay_period]);
+
+    const violationFines = parseFloat(fineRows[0]?.violation_fines) || 0;
+    const absenceFines = parseFloat(fineRows[0]?.absence_fines) || 0;
+    const lateFines = parseFloat(fineRows[0]?.late_fines) || 0;
+    const otherFines = parseFloat(fineRows[0]?.other_fines) || 0;
+    const totalFines = parseFloat(fineRows[0]?.total_fines) || 0;
+
+    // 5. Calculate net salary
+    const netSalary = Math.max(0, grossSalary - totalFines);
+
+    return {
+        worker_id,
+        name: worker.name,
+        pay_period,
+        wage_type: worker.wage_type,
+        rate_per_day_hour: wageRate,
+        days_worked: daysWorked,
+        hours_worked: hoursWorked,
+        gross_salary: Math.round(grossSalary * 100) / 100,
+        violation_fines: violationFines,
+        absence_fines: absenceFines,
+        late_fines: lateFines,
+        other_fines: otherFines,
+        total_fines: totalFines,
+        net_salary: Math.round(netSalary * 100) / 100
+    };
+}
+
+// Calculate payroll for a single worker (Server-side calculation)
+router.post('/calculate/:worker_id', authenticateToken, authorizeRoles('admin', 'accounts'), async (req, res) => {
+    try {
+        const { pay_period, auto_save = true } = req.body;
+        const period = pay_period || new Date().toISOString().slice(0, 7);
+        const calculation = await calculateWorkerPayroll(req.params.worker_id, period);
+
+        if (auto_save) {
+            await db.query(`
+                INSERT INTO salary (
+                    worker_id, pay_period, days_worked, hours_worked, rate_per_day_hour,
+                    gross_salary, violation_fines, absence_fines, late_fines, other_fines,
+                    total_fines, net_salary, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                ON CONFLICT(worker_id, pay_period) DO UPDATE SET
+                    days_worked = excluded.days_worked,
+                    hours_worked = excluded.hours_worked,
+                    rate_per_day_hour = excluded.rate_per_day_hour,
+                    gross_salary = excluded.gross_salary,
+                    violation_fines = excluded.violation_fines,
+                    absence_fines = excluded.absence_fines,
+                    late_fines = excluded.late_fines,
+                    other_fines = excluded.other_fines,
+                    total_fines = excluded.total_fines,
+                    net_salary = excluded.net_salary,
+                    updated_at = datetime('now', 'localtime')
+            `, [
+                calculation.worker_id,
+                calculation.pay_period,
+                calculation.days_worked,
+                calculation.hours_worked,
+                calculation.rate_per_day_hour,
+                calculation.gross_salary,
+                calculation.violation_fines,
+                calculation.absence_fines,
+                calculation.late_fines,
+                calculation.other_fines,
+                calculation.total_fines,
+                calculation.net_salary
+            ]);
+        }
+
+        res.json({ success: true, calculation, saved: !!auto_save });
+    } catch (error) {
+        console.error('Error calculating worker payroll:', error);
+        res.status(500).json({ error: error.message || 'Failed to calculate worker payroll' });
+    }
+});
+
+// Bulk server-side payroll generation for all active workers
+router.post('/generate-period', authenticateToken, authorizeRoles('admin', 'accounts'), async (req, res) => {
+    try {
+        const { pay_period } = req.body;
+        const period = pay_period || new Date().toISOString().slice(0, 7);
+
+        const [activeWorkers] = await db.query(
+            "SELECT worker_id FROM workers WHERE status = 'active'"
+        );
+
+        if (activeWorkers.length === 0) {
+            return res.json({ message: 'No active workers found', processed: 0 });
+        }
+
+        const results = [];
+        for (const w of activeWorkers) {
+            const calc = await calculateWorkerPayroll(w.worker_id, period);
+            await db.query(`
+                INSERT INTO salary (
+                    worker_id, pay_period, days_worked, hours_worked, rate_per_day_hour,
+                    gross_salary, violation_fines, absence_fines, late_fines, other_fines,
+                    total_fines, net_salary, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                ON CONFLICT(worker_id, pay_period) DO UPDATE SET
+                    days_worked = excluded.days_worked,
+                    hours_worked = excluded.hours_worked,
+                    rate_per_day_hour = excluded.rate_per_day_hour,
+                    gross_salary = excluded.gross_salary,
+                    violation_fines = excluded.violation_fines,
+                    absence_fines = excluded.absence_fines,
+                    late_fines = excluded.late_fines,
+                    other_fines = excluded.other_fines,
+                    total_fines = excluded.total_fines,
+                    net_salary = excluded.net_salary,
+                    updated_at = datetime('now', 'localtime')
+            `, [
+                calc.worker_id,
+                calc.pay_period,
+                calc.days_worked,
+                calc.hours_worked,
+                calc.rate_per_day_hour,
+                calc.gross_salary,
+                calc.violation_fines,
+                calc.absence_fines,
+                calc.late_fines,
+                calc.other_fines,
+                calc.total_fines,
+                calc.net_salary
+            ]);
+            results.push(calc);
+        }
+
+        res.json({
+            success: true,
+            message: `Payroll successfully generated for period ${period}`,
+            processed: results.length,
+            records: results
+        });
+    } catch (error) {
+        console.error('Error generating period payroll:', error);
+        res.status(500).json({ error: 'Failed to generate period payroll' });
+    }
+});
+
 module.exports = router;

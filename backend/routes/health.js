@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { authenticateToken, authorizeRoles, requireApiKeyOrAuth } = require('../middleware/auth');
 
 // Get all health alerts with filters and pagination
 router.get('/', authenticateToken, async (req, res) => {
@@ -79,8 +79,8 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
     }
 });
 
-// Create new health alert (Alert detection from camera or staff)
-router.post('/', async (req, res) => {
+// Create new health alert (Secured: requires internal API key or Bearer token)
+router.post('/', requireApiKeyOrAuth, async (req, res) => {
     try {
         const { worker_id, alert_type, severity, description, location, camera_id } = req.body;
 

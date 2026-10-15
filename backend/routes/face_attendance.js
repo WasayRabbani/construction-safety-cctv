@@ -49,12 +49,14 @@ router.post('/scan', async (req, res) => {
             }
 
             const worker = workers[0];
-            const checkInTime = new Date();
+            const now = new Date();
+            const check_in_time = now.toISOString().replace('T', ' ').slice(0, 19);
+            const attendance_date = now.toISOString().slice(0, 10);
 
-            // Check if already checked in today
+            // Check if already checked in today using indexed attendance_date
             const [existing] = await db.query(
-                'SELECT * FROM attendance WHERE worker_id = ? AND DATE(check_in_time) = CURDATE()',
-                [worker.worker_id]
+                'SELECT * FROM attendance WHERE worker_id = ? AND attendance_date = ?',
+                [worker.worker_id, attendance_date]
             );
 
             if (existing.length > 0) {
@@ -66,14 +68,15 @@ router.post('/scan', async (req, res) => {
                 });
             }
 
-            // Determine if late (assuming work starts at 8 AM)
-            const hour = checkInTime.getHours();
-            const status = (hour > 8 || (hour === 8 && checkInTime.getMinutes() > 30)) ? 'late' : 'present';
+            // Determine if late (work starts at 8:30 AM)
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const status = (hour > 8 || (hour === 8 && minute > 30)) ? 'late' : 'present';
 
             // Auto check-in
             await db.query(
-                'INSERT INTO attendance (worker_id, check_in_time, status, location) VALUES (?, ?, ?, ?)',
-                [worker.worker_id, checkInTime, status, 'Front Gate Camera']
+                'INSERT INTO attendance (worker_id, check_in_time, status, location, attendance_date) VALUES (?, ?, ?, ?, ?)',
+                [worker.worker_id, check_in_time, status, 'Front Gate Camera', attendance_date]
             );
 
             return res.json({

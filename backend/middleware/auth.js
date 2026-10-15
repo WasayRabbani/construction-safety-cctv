@@ -61,7 +61,28 @@ function authorizeRoles(...allowedRoles) {
     };
 }
 
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'ppe_internal_ai_secret_key_2026';
+
+/**
+ * Middleware: Requires either a valid x-api-key header (for Python AI services)
+ * OR a valid Bearer JWT token (for logged-in staff).
+ * Rule 1 & Rule 2 (Security First & Authentication)
+ */
+function requireApiKeyOrAuth(req, res, next) {
+    const apiKey = req.headers['x-api-key'];
+
+    if (apiKey && apiKey === INTERNAL_API_KEY) {
+        req.isInternalService = true;
+        req.user = { role: 'ai_service', username: 'internal_ai' };
+        return next();
+    }
+
+    // Fall back to Bearer JWT authentication
+    authenticateToken(req, res, next);
+}
+
 module.exports = {
     authenticateToken,
-    authorizeRoles
+    authorizeRoles,
+    requireApiKeyOrAuth
 };

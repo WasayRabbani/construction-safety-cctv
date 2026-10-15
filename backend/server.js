@@ -4,11 +4,21 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 
+// Initialize the express web application instance line 8 to 9
 const app = express();
 const PORT = process.env.API_PORT || 4000;
 
+/* Line 10-18 
+
+cors allows browser to make different api calls to your server from different domain
+
+*/
+
+
 // Middleware
 app.use(cors());
+
+// Here i have used limit as 50mb, where as in standard servers we use 1mb to prevent Denial or serice attack, this is because workers registeration uploads multiple high resolution BAse64 face photos in single request. 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -25,6 +35,7 @@ const violationsRoutes = require('./routes/violations');
 const salaryRoutes = require('./routes/salary');
 const healthRoutes = require('./routes/health');
 const faceAttendanceRoutes = require('./routes/face_attendance');
+const camerasRoutes = require('./routes/cameras');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workers', workersRoutes);
@@ -33,6 +44,7 @@ app.use('/api/violations', violationsRoutes);
 app.use('/api/salary', salaryRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/face-attendance', faceAttendanceRoutes);
+app.use('/api/cameras', camerasRoutes);
 
 // =======================
 // Pages

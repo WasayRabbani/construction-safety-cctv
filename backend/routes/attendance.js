@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireApiKeyOrAuth } = require('../middleware/auth');
 
 // Get attendance for a specific date (Rule 1 & 2)
 router.get('/date/:date', authenticateToken, async (req, res) => {
@@ -46,8 +46,8 @@ router.get('/stats/today', authenticateToken, async (req, res) => {
     }
 });
 
-// Check in worker
-router.post('/checkin', async (req, res) => {
+// Check in worker (Secured: requires internal API key or Bearer token)
+router.post('/checkin', requireApiKeyOrAuth, async (req, res) => {
     try {
         const { worker_id, location } = req.body;
         if (!worker_id) {
@@ -80,8 +80,8 @@ router.post('/checkin', async (req, res) => {
     }
 });
 
-// Check out worker
-router.put('/checkout/:attendance_id', async (req, res) => {
+// Check out worker (Secured: requires internal API key or Bearer token)
+router.put('/checkout/:attendance_id', requireApiKeyOrAuth, async (req, res) => {
     try {
         const attendance_id = req.params.attendance_id;
 

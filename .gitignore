@@ -5,6 +5,10 @@
 node_modules/
 package-lock.json
 
+# SQLite Database
+backend/database/*.sqlite
+backend/database/*.sqlite-journal
+
 # Python Virtual Environments & Cache
 .venv/
 venv/
@@ -13,12 +17,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-Face_recognition/.venv/
-Face_recognition/__pycache__/
+ai_services/.venv/
+ai_services/__pycache__/
 
 # Private / Processed Media
-Face_recognition/processed_videos/
-Face_recognition/employees/
+ai_services/processed_videos/
+ai_services/employees/
 backend/uploads/
 hls/
 *.mp4

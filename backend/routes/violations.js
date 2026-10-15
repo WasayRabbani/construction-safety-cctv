@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { authenticateToken, authorizeRoles, requireApiKeyOrAuth } = require('../middleware/auth');
 
 // Get all violations with filters and pagination (Rules 8 & 9)
 router.get('/', authenticateToken, async (req, res) => {
@@ -84,8 +84,8 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
     }
 });
 
-// Create new violation (Can be called by Python AI service or admin)
-router.post('/', async (req, res) => {
+// Create new violation (Secured: requires internal API key from Python AI or Bearer token from admin)
+router.post('/', requireApiKeyOrAuth, async (req, res) => {
     try {
         let { violation_id, worker_id, violation_type, severity, camera_id, fine_amount, snapshot_path } = req.body;
 
@@ -110,10 +110,21 @@ router.post('/', async (req, res) => {
             [violation_id, worker_id || null, violation_type, severity, camera_id || null, fine_amount, snapshot_path || null]
         );
 
+        // If worker is identified and fine amount > 0, log into fines table
+        if (worker_id && fine_amount > 0) {
+            const fineDate = new Date().toISOString().slice(0, 10);
+            await db.query(
+                `INSERT INTO fines (worker_id, violation_id, fine_type, fine_amount, description, fine_date, status)
+                 VALUES (?, ?, 'violation', ?, ?, ?, 'pending')`,
+                [worker_id, violation_id, fine_amount, `Safety fine: ${violation_type} (${severity})`, fineDate]
+            );
+        }
+
         res.status(201).json({
             success: true,
             message: 'Violation recorded successfully',
-            violation_id
+            violation_id,
+            fine_logged: worker_id && fine_amount > 0
         });
     } catch (error) {
         console.error('Error creating violation:', error);
@@ -133,7 +144,14 @@ router.put('/:id/resolve', authenticateToken, authorizeRoles('admin', 'superviso
             return res.status(404).json({ error: 'Violation not found' });
         }
 
-        res.json({ message: 'Violation resolved successfully' });
+        // Also waive any pending fine associated with this resolved violation
+        await db.query(
+            `UPDATE fines SET status = 'waived', notes = 'Waived upon violation resolution' 
+             WHERE violation_id = ? AND status = 'pending'`,
+            [req.params.id]
+        );
+
+        res.json({ message: 'Violation resolved and associated fine waived successfully' });
     } catch (error) {
         console.error('Error resolving violation:', error);
         res.status(500).json({ error: 'Failed to resolve violation' });
