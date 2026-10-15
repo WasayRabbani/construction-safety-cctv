@@ -22,10 +22,8 @@ BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:4000')
 INTERNAL_API_KEY = os.environ.get('INTERNAL_API_KEY', 'dev-internal-key-change-in-prod')
 
 # IMOU / RTSP Camera configuration
-DEFAULT_RTSP_URL = os.environ.get(
-    'RTSP_CAMERA_URL',
-    'rtsp://admin:L2C9A3C5@192.168.137.142:554/cam/realmonitor?channel=1&subtype=0'
-)
+DEFAULT_RTSP_URL = os.environ.get('RTSP_CAMERA_URL', '0')
+
 
 # Standard PPE violations
 VIOLATIONS = {
